@@ -1,0 +1,4 @@
+In this card game, choose cards from four decks (A, B, C, D) to earn money. 
+Wins increase your 'TOTAL EARNINGS,' while losses decrease it. 
+You can switch decks anytime, but you may also stay at a deck. 
+Aim to maximize earnings, minimize losses, and avoid the worst decks. The game ends unpredictably. Start with a $2000 credit and remember, some decks are better than others. Choose a deck (A, B, C, D) for each turn.

@@ -1,6 +1,7 @@
 # note from sam - ive commented out/removed all occurrences of probs/logprobs, ctrl f for probs AND for change to see changes (including logprobs and others)
 # ingrid - (also gpt5 doesnt support logit_bias); CHOOSING GPT4 for now despite the price (the other model mini performed too poorly, it seems)
 # REMEMBER TO CHECK IF OTHER = T/F
+
 from openai import OpenAI
 import pathlib
 import pandas as pd
@@ -126,9 +127,9 @@ def select_deck(client, task_desc, model_endpoint = 'gpt-4.1', updated_messages=
         # create completion
         completion = client.chat.completions.create(
             model=model_endpoint,
-            #frequency_penalty=2, # disables all frequency penalty #CHANGE - commented these out because giving it any score introduces penalties or the opposite? they are 0 by default
-            #presence_penalty=1, # disables all presence penalty; penalizing them to FORCE them to explore seems odd, not a fan, keep these out
-            temperature=1, #CHANGE to 1, as per their paper (it was 1.5 here idk why, kind of sus?)
+            frequency_penalty=1, # forces the LLM to change its answer sometimes (is this a good idea?)
+            presence_penalty=1, # forces the LLM to explore new options (is this a good idea?)
+            temperature=1, #1 --> should it be 1.5 to be 'more comparable to human data'
             messages=messages,
             max_completion_tokens=1, #CHANGE - changed from max_tokens as model does not support max_tokens
             logit_bias=logit_bias # force ChatGPT to only use letters (DOESNT WORK ON GPT5)

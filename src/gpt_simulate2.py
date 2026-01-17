@@ -14,7 +14,7 @@ def input_parse():
     parser = argparse.ArgumentParser(description='Run the GPT simulation')
 
     parser.add_argument("-other", "--other_letters", help='If specified, use other deck names (E, F, G, H)', action="store_true")
-    parser.add_argument("-nudge", "--nudge_choices", help='Whether to use nudging parameters', action="store_true")
+    parser.add_argument("-nudge", "--nudge_choices", help='Whether to use nudging parameters', action="store_true") #this goes unused; only there if "less ideal" (noisier!) decision-making is desired from the model
 
     return parser.parse_args()
 
@@ -203,7 +203,7 @@ def update_messages(messages, card_selection, win, loss, total_earnings, empty_d
 
     return messages
 
-def save_data(data:dict, updated_messages, data_path, other=False):
+def save_data(data:dict, updated_messages, data_path, other=False, nudged = False):
     '''
     Save data as a csv and save messages as a txt
     '''
@@ -224,6 +224,9 @@ def save_data(data:dict, updated_messages, data_path, other=False):
         filename = f"gpt_{formatted_time}_EFGH"
     else:
         filename = f"gpt_{formatted_time}_ABCD"
+
+    if nudged:
+        filename = filename + "_nudged"
     
     df.to_csv(data_path/ f"{filename}.csv", index=False)
 
@@ -290,7 +293,7 @@ def main():
         print()
 
     data_path = path / "data" / "raw_data" / "GPTdata"
-    save_data(data, updated_messages, data_path=data_path, other=args.other_letters)
+    save_data(data, updated_messages, data_path=data_path, other=args.other_letters, nudged = args.nudge_choices)
 
 if __name__ == '__main__':
     main()

@@ -2,6 +2,8 @@
 # ingrid - (also gpt5 doesnt support logit_bias); CHOOSING GPT4 for now despite the price (the other model mini performed too poorly, it seems)
 # REMEMBER TO CHECK IF OTHER = T/F
 
+# (do 15 per condition ABCD/EFGH for 30 per language, or only 8 for 16?)
+
 from openai import OpenAI
 import pathlib
 import pandas as pd

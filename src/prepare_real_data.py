@@ -24,11 +24,11 @@ def prepare_ahn(data_path, filename:str="healthy_control", save_path=None):
     # group by subject id to see how many observatiions each subject has
     count = df.groupby('subjID').count()
 
-    # get the last 30 subject ids in count (WE COULD TAKE A DIFFERENT SUBSET OF IDS!!!!!)
-    last_30 = count.index[-30:]
+    # get the last 16 subject ids in count (LESS THAN THE ORIGINAL 30, since less data for each condition)
+    last_16 = count.index[-16:]
 
-    # filter df to only include last 30 subjects
-    df = df[df['subjID'].isin(last_30)].reset_index(drop=True)
+    # filter df to only include last 16 subjects
+    df = df[df['subjID'].isin(last_16)].reset_index(drop=True)
 
     # drop gain and loss
     df = df.drop(columns=['gain', 'loss', 'trial'])
@@ -125,13 +125,13 @@ def load_gpt(datapath):
 
     return df
 
-def clean_gpt(gpt_df, save_path=None):
+def clean_gpt(gpt_df, save_path=None, japanese =False):
     '''
     Cleans GPT data by translating decks, adding outcomes, dropping unnecessary columns and renaming columns
     '''
     ## translate the decks
     # translate A and E to 1
-    gpt_df['deck'] = gpt_df['deck'].replace({"A":1, "E":1})
+    gpt_df['deck'] = gpt_df['deck'].replace({"A":1, "E":1}) #note: deprecation warning; too lazy to fix rn
 
     # translate B and F to 2
     gpt_df['deck'] = gpt_df['deck'].replace({"B":2, "F":2})
@@ -146,14 +146,16 @@ def clean_gpt(gpt_df, save_path=None):
     gpt_df['X'] = gpt_df['gain'] - gpt_df['loss']
 
     # drop unnecessary columns
-    gpt_df = gpt_df.drop(columns=['gain', 'loss', 'trial', 'probabilities'])
+    gpt_df = gpt_df.drop(columns=['gain', 'loss', 'trial'])
 
     # rename columns
     gpt_df = gpt_df.rename(columns={'deck':'x'})
 
-    # save data
-    gpt_df.to_csv(save_path / f"clean_gpt.csv", index=False)
-
+    if japanese:
+        gpt_df.to_csv(save_path / f"clean_gpt_JP.csv", index=False)
+    else:
+        gpt_df.to_csv(save_path / f"clean_gpt_EN.csv", index=False)
+        
     return gpt_df
     
 
@@ -174,10 +176,12 @@ def main():
     df_ahn = prepare_ahn(data_path = data_root / "Ahn2014", filename="healthy_control", save_path=save_path)
 
     # load gpt data
-    df_gpt = load_gpt(data_root / "GPTdata")
+    df_gpt_en = load_gpt(data_root / "GPTdata" / "ENGLISH")
+    df_gpt_jp = load_gpt(data_root / "GPTdata" / "JAPANESE")
 
     # translate gpt data
-    df_gpt = clean_gpt(df_gpt, save_path=save_path)
+    df_gpt_en = clean_gpt(df_gpt_en, save_path=save_path, japanese=False)
+    df_gpt_jp = clean_gpt(df_gpt_jp, save_path=save_path, japanese=True)
 
     # create extra samples for ahn data
     create_ahn_extra_samples(data_path = data_root / "Ahn2014", n_samples=4, filename="healthy_control", save_path=save_path)

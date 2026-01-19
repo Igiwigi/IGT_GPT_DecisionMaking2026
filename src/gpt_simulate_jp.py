@@ -1,9 +1,4 @@
-# note from sam - ive commented out/removed all occurrences of probs/logprobs, ctrl f for probs AND for change to see changes (including logprobs and others)
-# ingrid - (also gpt5 doesnt support logit_bias); CHOOSING GPT4 for now despite the price (the other model mini performed too poorly, it seems)
-# REMEMBER TO CHECK IF OTHER = T/F
-
-# (do 15 per condition ABCD/EFGH for 30 per language, or only 8 for 16?)
-
+#more readable than adding it as a parser arguement for now (Japanese separately instead of in the same file)
 from openai import OpenAI
 import pathlib
 import pandas as pd
@@ -14,7 +9,6 @@ import argparse
 
 def input_parse():
     parser = argparse.ArgumentParser(description='Run the GPT simulation')
-
     parser.add_argument("-other", "--other_letters", help='If specified, use other deck names (E, F, G, H)', action="store_true")
     parser.add_argument("-nudge", "--nudge_choices", help='Whether to use nudging parameters', action="store_true") #this goes unused; only there if "less ideal" (noisier!) decision-making is desired from the model
 
@@ -54,7 +48,7 @@ def create_all_decks(other=False):
     return decks
 
 def create_task_description(task_desc_path, other=False):
-    with open(task_desc_path / 'modified_task_desc.txt', 'r') as f:
+    with open(task_desc_path / 'modified_task_desc_japanese.txt', 'r', encoding='utf-8') as f:
         task_desc = f.read() 
     
     if other:
@@ -98,7 +92,8 @@ def select_deck(client, task_desc, model_endpoint = 'gpt-4.1', updated_messages=
     if updated_messages is None:
         messages = [
             {"role": "system", "content": task_desc},
-            {"role": "user", "content": task_desc + "\n" + f"'{d1}、{d2}、{d3}、それとも{d4}？'"}
+            {"role": "user", "content": task_desc + "\n" + f"{d1}、{d2}、{d3}、{d4}のどれを選びますか？"}
+
         ]
     else: 
         messages = updated_messages
@@ -128,7 +123,7 @@ def select_deck(client, task_desc, model_endpoint = 'gpt-4.1', updated_messages=
         else:
             messages.append({"role": "assistant", "content": card_selection})
             available_decks = ", ".join(letters)
-            messages.append({"role": "user", "content": f"'使用したいデッキのアルファベットのみを指定してください。利用可能なデッキは {available_decks} です。'"})
+            messages.append({"role": "user", "content": f"使用するデッキのアルファベットを1文字で入力してください。選択可能なデッキは {available_decks} です。"})
             attempt_count += 1
             time.sleep(5)
 
@@ -179,26 +174,23 @@ def update_messages(messages, card_selection, win, loss, total_earnings, empty_d
     d4 = letters[3]
 
     messages.append({"role": "assistant", "content": card_selection})
+    payoff_message = f"{win}ドルを獲得しました。"
 
-    payoff_message = f" あなたは${win}ドル勝ちました！"
-    
     if loss > 0:
-        loss_message = f"しかし、${loss}ドル負けました！"
+        loss_message = f"{loss}ドル失いました。"
         payoff_message += "\n" + loss_message
 
-    payoff_message += f"\n総獲得額（TOTAL EARNINGS）：${total_earnings}。"
-
-    payoff_message += f"\n借入金：$2000。"
+    payoff_message += f"\n総獲得額：{total_earnings}ドル"
+    payoff_message += f"\n開始時の所持金：2000ドル"
 
     messages.append({"role": "user", "content": payoff_message})
 
     if empty_deck is None:
-        messages.append({"role": "user", "content": f"'{d1}、{d2}、{d3}、それとも{d4}？'"})
+        messages.append({"role": "user", "content": f"{d1}、{d2}、{d3}、{d4}のどれを選びますか？"})
 
     else:
         not_empty = [d for d in letters if d != empty_deck]
-
-        new_message = f"デッキ{empty_deck}は空です。{not_empty[0]}、{not_empty[1]}、それとも{not_empty[2]}？"
+        new_message = f"デッキ{empty_deck}は使用できません。{not_empty[0]}、{not_empty[1]}、{not_empty[2]}の中から選んでください。"
 
         messages.append({"role": "user", "content": new_message})
 
@@ -231,7 +223,7 @@ def save_data(data:dict, updated_messages, data_path, other=False, nudged = Fals
     
     df.to_csv(data_path/ f"{filename}.csv", index=False)
 
-    with open(log_path / f"{filename}.txt", 'w') as f:
+    with open(log_path / f"{filename}.txt", 'w', encoding='utf-8') as f:
         f.write(str(updated_messages))
 
         
@@ -293,7 +285,7 @@ def main():
         print(trials_played, card_selection, win, loss)
         print()
 
-    data_path = path / "data" / "raw_data" / "GPTdata"
+    data_path = path / "data" / "raw_data" / "GPTdata" / "JAPANESE"
     save_data(data, updated_messages, data_path=data_path, other=args.other_letters, nudged = args.nudge_choices)
 
 if __name__ == '__main__':

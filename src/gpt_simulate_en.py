@@ -54,7 +54,7 @@ def create_all_decks(other=False):
     return decks
 
 def create_task_description(task_desc_path, other=False):
-    with open(task_desc_path / 'modified_task_desc.txt', 'r') as f:
+    with open(task_desc_path / 'modified_task_desc.txt', 'r', encoding='utf-8') as f:
         task_desc = f.read() 
     
     if other:
@@ -294,7 +294,7 @@ def main():
         print(trials_played, card_selection, win, loss)
         print()
 
-    data_path = path / "data" / "raw_data" / "GPTdata"
+    data_path = path / "data" / "raw_data" / "GPTdata" / "ENGLISH"
     save_data(data, updated_messages, data_path=data_path, other=args.other_letters, nudged = args.nudge_choices)
 
 if __name__ == '__main__':

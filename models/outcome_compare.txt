@@ -1,0 +1,39 @@
+model { 
+  ## priors ## 
+  alpha ~ dnorm(0, .1)
+  mu ~ dnorm(0, .1)
+
+  # variability between subjects 
+  Glambda ~ dgamma(.1, .1)
+
+  for (s in 1:nsubs) {
+
+    # variability between trials
+    Slambda_grp1[s] ~ dgamma(.1, .1)
+
+    Smu_grp1[s] ~ dnorm(mu - (alpha/2), Glambda)
+
+    for (t in 1:ntrials[s]) {
+  
+      X_grp1[s,t] ~ dnorm(Smu_grp1[s],Slambda_grp1[s])
+  
+    }
+  
+  }
+
+
+  for (s in 1:nsubs) {
+
+    # variability between trials
+    Slambda_grp2[s] ~ dgamma(.1, .1)
+
+    Smu_grp2[s] ~ dnorm(mu + (alpha/2), Glambda)
+
+    for (t in 1:ntrials[s]) {
+  
+      X_grp2[s,t] ~ dnorm(Smu_grp2[s],Slambda_grp2[s])
+  
+    }
+  
+  }
+}

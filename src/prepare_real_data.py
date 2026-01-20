@@ -75,8 +75,8 @@ def create_ahn_extra_samples(data_path, n_samples=5, filename:str="healthy_contr
 
     # loop over subjects
     for i in range(n_samples):
-        # sample 30 subjects
-        sample = np.random.choice(subjects, 30, replace=False)
+        # sample 16 subjects (doing less than 30 since we have less data points per subject?)
+        sample = np.random.choice(subjects, 16, replace=False)
 
         # filter df with sample
         df_sample = df[df['subjID'].isin(sample)].reset_index(drop=True)

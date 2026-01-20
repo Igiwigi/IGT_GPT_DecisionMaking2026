@@ -1,27 +1,31 @@
 #install.packages("pacman")
-pacman::p_load(R2jags, parallel)
+pacman::p_load(R2jags, parallel, glm)
 
 # set seed
 set.seed(2502)
 
 # overview of all groups that can be run 
-groups <- c("gpt", "ahn_hc", "ahn_hc_1", "ahn_hc_2", "ahn_hc_3", "ahn_hc_4")
+#groups <- c("gpt", "ahn_hc", "ahn_hc_1", "ahn_hc_2", "ahn_hc_3", "ahn_hc_4")
+
+#dont have extra sample groups
+groups <- c("ahn_hc", "gpt_EN", "gpt_JP")
 
 ### SECTION WHERE YOU CAN CHANGE THINGS ###
 fixed_theta <- TRUE # if FALSE then theta is estimated (included in params and a different model file is used)
 
 # change the root path according to your needs (i.e., where the ChatGPT-IGT folder is located)
 #root_path <- "~/Desktop/dm-code" # personal comp
-root_path <- "dm-code" # UCloud
+#root_path <- "dm-code" # UCloud
+
+#new root path
+root_path <- "~/IGT_LLM_DecisionMaking"
 
 # select group and read in data 
-group_name = groups[2] # group 1: gpt, group 2: ahn_hc, group 3: ahn_hc_1, group 4: ahn_hc_2, group 5: ahn_hc_3, group 6: ahn_hc_4
+group_name = groups[2] # group1 human, group2 gpt_en, group3 gpt_jp
 
 ### CODE ###
 # create and load file based on group selection
-file <- ifelse(grepl("^ahn_hc_", group_name), 
-               file.path(root_path, "ChatGPT-IGT", "data", "final_data", "extra_samples", paste0("clean_", group_name, ".csv")), 
-               file.path(root_path, "ChatGPT-IGT", "data", "final_data", paste0("clean_", group_name, ".csv")))
+file <- file.path(root_path, "data", "final_data", paste0("clean_", group_name, ".csv"))
 data <- read.csv(file)
 
 # extract relevant variables
@@ -47,7 +51,7 @@ for (s in 1:nsubs) {
   # extract x and X for subject s
   X_sub <- X_raw[data$subjID==subIDs[s]] 
   x_sub <- x_raw[data$subjID==subIDs[s]] 
-
+  
   # assign arrays
   x[s,] <- x_sub
   X[s,] <- X_sub
@@ -60,10 +64,10 @@ X <- X/100
 jags_data <- list("x","X","ntrials","nsubs") 
 if (fixed_theta) {
   params<-c("mu_a_rew","mu_a_pun","mu_K","mu_omega_f","mu_omega_p") 
-  model_file <- file.path(root_path, "ChatGPT-IGT", "models", "hier_ORL_fixed_theta.txt")
+  model_file <- file.path(root_path, "models", "hier_ORL_fixed_theta.txt")
 } else {
   params<-c("mu_a_rew","mu_a_pun","mu_K","mu_theta","mu_omega_f","mu_omega_p") 
-  model_file <- file.path(root_path, "ChatGPT-IGT", "models", "hier_ORL.txt")
+  model_file <- file.path(root_path, "models", "hier_ORL.txt")
 }
 
 # set timer
@@ -78,9 +82,7 @@ samples <- jags.parallel(jags_data, inits=NULL, params,
 print(samples$BUGSoutput)
 
 # save summary to txt file depending on group
-ifelse(grepl("^ahn_hc_", group_name),
-        summary_file <- file.path(root_path, "ChatGPT-IGT", "src", "estimation", "results", "extra_samples", paste0("summary_param_estimated_", group_name, ".txt")),
-        summary_file <- file.path(root_path, "ChatGPT-IGT", "src", "estimation", "results", paste0("summary_param_estimated_", group_name, ".txt")))
+summary_file <- file.path(root_path, "src", "2_estimation", "results", paste0("summary_param_estimated_", group_name, ".txt"))
 
 write.table(samples$BUGSoutput$summary, summary_file)
 
@@ -89,12 +91,14 @@ Y <- samples$BUGSoutput$sims.list
 mu_a_rew <- Y$mu_a_rew
 mu_a_pun <- Y$mu_a_pun
 mu_K <- Y$mu_K
-mu_theta <- Y$mu_theta
+if (!fixed_theta) {
+  mu_theta <- Y$mu_theta
+}
 mu_omega_f <- Y$mu_omega_f
 mu_omega_p <- Y$mu_omega_p
 
 # plot traceplots
-plotfile <- file.path(root_path, "ChatGPT-IGT", "src", "estimation", "plots", "traceplots", paste0("trace_", group_name, ".png"))
+plotfile <- file.path(root_path, "src", "2_estimation", "plots", "traceplots", paste0("trace_", group_name, ".png"))
 png(plotfile, width = 2500, height = 2500, res = 400)
 traceplot(samples$BUGSoutput, ask=FALSE, mfrow = c(3, 2), varname=params)
 dev.off()
@@ -107,9 +111,7 @@ if (fixed_theta) {
 }
 
 # save df (if it is an extra sample e.g., ahn_hc_3, then save to the "extra_samples" folder within results)
-ifelse(grepl("^ahn_hc_", group_name),
-        savefile <- file.path(root_path, "ChatGPT-IGT", "src", "estimation", "results", "extra_samples", paste0("param_estimated_", group_name, ".csv")),
-        savefile <- file.path(root_path, "ChatGPT-IGT", "src", "estimation", "results", paste0("param_estimated_", group_name, ".csv")))
+savefile <- file.path(root_path, "src", "2_estimation", "results", paste0("param_estimated_", group_name, ".csv"))
 
 write.csv(df, savefile)
 

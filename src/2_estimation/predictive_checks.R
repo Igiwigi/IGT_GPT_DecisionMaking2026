@@ -10,14 +10,16 @@ fixed_theta <- TRUE
 # defining a function for calculating the maximum of the posterior density (not exactly the same as the mode)
 MPD <- function(x) {density(x)$x[which(density(x)$y==max(density(x)$y))]}
 
-root_path <- "~/Desktop/dm-code" # personal comp
-#root_path <- "dm-code" # UCloud
-group_name = "ahn_hc" # write either "ahn_hc" or "gpt"
-file <- file.path(root_path, "ChatGPT-IGT", "data", "final_data", paste0("clean_", group_name, ".csv"))
+#name the folder with all the code this for it to work etc.
+root_path <- "~IGT_LLM_DecisionMaking"
+
+group_name = "ahn_hc"
+
+file <- file.path(root_path, "data", "final_data", paste0("clean_", group_name, ".csv"))
 data <- read.csv(file)
 
 # get vars
-source(file.path(root_path, "ChatGPT-IGT", "src", "data_util.R"))
+source(file.path(root_path, "src", "data_util.R"))
 data_vars <- processData(data)
 
 # unpack vars
@@ -29,24 +31,23 @@ nsubs <- data_vars$nsubs
 pred_success <- array(nsubs)
 
 start_time = Sys.time()
+
 for (s in 1:nsubs) {
   start_iteration = Sys.time()
+  
   x <- x_all[s, ]
   X <- X_all[s, ]
   ntrials <- 100
   
   # set up jags and run jags model on one subject
   data <- list("x","X","ntrials")
-
-
   if (fixed_theta) {  
     params<-c("a_rew","a_pun","K","omega_f","omega_p","p")
-    model_file <- file.path(root_path, "ChatGPT-IGT", "models", "ORL_fixed_theta.txt")
+    model_file <- file.path(root_path, "models", "ORL_fixed_theta.txt")
   } else {
     params<-c("a_rew","a_pun","K","theta","omega_f","omega_p","p")
-    model_file <- file.path(root_path, "ChatGPT-IGT", "models", "ORL.txt")
+    model_file <- file.path(root_path, "models", "ORL.txt")
   }
-
   temp_samples <- jags.parallel(data, inits=NULL, params,
                                 model.file =model_file,
                                 n.chains=3, n.iter=3000, n.burnin=1000, n.thin=1, n.cluster=3)
@@ -67,8 +68,8 @@ for (s in 1:nsubs) {
     
   }
   
-  pred_success[s] <- sum(x_predict==x[1:ntrials]) # only comparing with trials for which we have choices
-    
+  pred_success[s] <- sum(x_predict==x[1:ntrials])
+  
   end_iteration <- Sys.time()
   run_iteration <- round(end_iteration - start_iteration, 2)
   print(paste0(s, " Iteration time: ", run_iteration))
@@ -82,5 +83,5 @@ print(paste0("Total run time: ", run_time))
 pred_success_df <- data.frame(pred_success)
 
 # save df
-savefile <- file.path(root_path, "ChatGPT-IGT", "src", "estimation", "results", paste0("pred_success_", group_name, ".csv"))
+savefile <- file.path(root_path, "src", "2_estimation", "results", paste0("pred_success_", group_name, ".csv"))
 write.csv(pred_success_df, savefile)

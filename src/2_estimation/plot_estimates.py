@@ -201,7 +201,7 @@ def plot_multiple_descriptive_adequacies(hc_data, gpt_data, colors = ["#52993C",
 def main(): 
     # define paths
     path = pathlib.Path(__file__)
-    data_path = path.parents[2] / "src" / "estimation" / "results"
+    data_path = path.parents[2] / "src" / "2_estimation" / "results"
     
     # load parameter estimation data
     hc_data_params = pd.read_csv(data_path / "param_estimated_ahn_hc.csv")
@@ -211,7 +211,7 @@ def main():
     set_font()
 
     # plot posteriors
-    plot_posteriors(hc_data_params, gpt_data_params, save_path=path.parents[2] / "src" / "estimation" / "plots" / "posterior_compare_w_priors", show_priors=True)
+    plot_posteriors(hc_data_params, gpt_data_params, save_path=path.parents[2] / "src" / "2_estimation" / "plots" / "posterior_compare_w_priors", show_priors=True)
 
      # load all csv files in the extra_samples subfolder in results
     hc_samples = []
@@ -219,14 +219,14 @@ def main():
         hc_samples.append(pd.read_csv(file))
     
     # plot posteriors
-    plot_hc_posteriors(hc_data_params, hc_samples, save_path=path.parents[2] / "src" / "estimation" / "plots" / "posterior_compare_hc")
+    plot_hc_posteriors(hc_data_params, hc_samples, save_path=path.parents[2] / "src" / "2_estimation" / "plots" / "posterior_compare_hc")
 
     # load posterior predictions data
     hc_data_pred = pd.read_csv(data_path / "pred_success_ahn_hc.csv")
     gpt_data_pred = pd.read_csv(data_path / "pred_success_gpt.csv")
 
     # plot descriptive adequacy
-    plot_multiple_descriptive_adequacies(hc_data_pred, gpt_data_pred, save_path=path.parents[2] / "src" / "estimation" / "plots" / "descriptive_adequacy")
+    plot_multiple_descriptive_adequacies(hc_data_pred, gpt_data_pred, save_path=path.parents[2] / "src" / "2_estimation" / "plots" / "descriptive_adequacy")
 
 
 

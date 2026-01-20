@@ -32,18 +32,18 @@ def calculate_deck_preferences(data):
     return proportions
 
 
-def plot_deck_preferences(data1, data2, labels, window_size=10, save_path=None):
-    # Create a plot with two subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+def plot_deck_preferences(data1, data2, data3, labels, window_size=10, save_path=None):
+    # Create a plot with three subplots
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 10))
 
     # add space between subplots
-    fig.subplots_adjust(hspace=0.3)
+    fig.subplots_adjust(hspace=0.5, top=0.90)
 
     # Define colors for all four decks
     colors = ["#F59B8C", "#B43622", "#A1E780", "#3CA50A"]
 
     # loop over both subplots and datasets
-    for i, (ax, data) in enumerate(zip([ax1, ax2], [data1, data2])):
+    for i, (ax, data) in enumerate(zip([ax1, ax2, ax3], [data1, data2, data3])):
         # Apply smoothing
         smooth_data = data.iloc[:, 1:].rolling(window=window_size, min_periods=1).mean()
         std_error = data.iloc[:, 1:].rolling(window=window_size, min_periods=1).std()
@@ -56,7 +56,9 @@ def plot_deck_preferences(data1, data2, labels, window_size=10, save_path=None):
         # Plotting line and shaded confidence interval on the correct axis
         for j, deck in enumerate(smooth_data.columns):
             ax.plot(data['trial'], smooth_data[deck], label=deck, color=colors[j])
-            ax.fill_between(data['trial'], (smooth_data[deck] - ci[deck]), (smooth_data[deck] + ci[deck]), color=colors[j], alpha=alpha)
+            lower_bound = np.maximum(smooth_data[deck] - ci[deck], 0)
+            upper_bound = np.minimum(smooth_data[deck] + ci[deck], 1)
+            ax.fill_between(data['trial'], lower_bound, upper_bound, color=colors[j], alpha=alpha)
         
         # set x-axis ticks to every 10th trial
         ax.set_xticks(np.arange(0, 101, 10))
@@ -68,7 +70,7 @@ def plot_deck_preferences(data1, data2, labels, window_size=10, save_path=None):
         ax.grid(color='grey', linestyle='-', linewidth=0.25, alpha=0.5)
 
         # set title
-        ax.set_title(labels[i])
+        ax.set_title(labels[i], pad=10)
 
     # add custom legend
     custom_lines = [Line2D([0], [0], color=colors[0], lw=2),
@@ -77,19 +79,27 @@ def plot_deck_preferences(data1, data2, labels, window_size=10, save_path=None):
                     Line2D([0], [0], color=colors[3], lw=2)]
 
     # add legend
-    ax1.legend(custom_lines, ['Deck A', 'Deck B', 'Deck C', 'Deck D'], loc='upper center', bbox_to_anchor=(0.5, 1.3), ncol=4)
+    fig.legend(custom_lines, ['Deck A', 'Deck B', 'Deck C', 'Deck D'], loc='upper center', bbox_to_anchor=(0.5, 0.98), ncol=4)
 
     # add y-axis label
     ax1.set_ylabel('Choice Proportions')
     ax2.set_ylabel('Choice Proportions')
+    ax3.set_ylabel('Choice Proportions')
 
     # add x-axis label
+    ax1.set_xlabel('Trial number')
     ax2.set_xlabel('Trial number')
-    ax2.set_xlabel('Trial number')
+    ax3.set_xlabel('Trial number')
 
     # expand y axis
     ax1.set_ylim(0, 0.5)
-    ax2.set_ylim(0, 0.5)
+    ax2.set_ylim(0, 1)
+    ax3.set_ylim(0, 0.9)
+    
+    #limit x axis
+    ax1.set_xlim(0, 100)
+    ax2.set_xlim(0, 100)
+    ax3.set_xlim(0, 100)
 
     # save the plot
     if save_path is not None:
@@ -102,18 +112,21 @@ def main():
     data_path = path.parents[2] / "data" / "final_data"
 
     # load both final datasets
-    hc_data = pd.read_csv(data_path / "clean_gpt.csv")
-    gpt_data = pd.read_csv(data_path / "clean_ahn_hc.csv")
+    ahn_data = pd.read_csv(data_path / "clean_ahn_hc.csv")
+    eng_gpt_data = pd.read_csv(data_path / "clean_gpt_EN.csv")
+    jp_gpt_data = pd.read_csv(data_path / "clean_gpt_JP.csv")
+
 
     # calculate deck preferences
-    hc_deck_preferences = calculate_deck_preferences(hc_data)
-    gpt_deck_preferences = calculate_deck_preferences(gpt_data)
+    ahn_deck_preferences = calculate_deck_preferences(ahn_data)
+    en_gpt_deck_preferences = calculate_deck_preferences(eng_gpt_data)
+    jp_gpt_deck_preferences = calculate_deck_preferences(jp_gpt_data)
 
     # set font
     set_font()
 
     # plot deck preferences
-    plot_deck_preferences(hc_deck_preferences, gpt_deck_preferences, labels=['Humans', 'ChatGPT'], save_path=path.parents[2] / "src" / "descriptives" / "plots" / "deck_preferences.png")
+    plot_deck_preferences(ahn_deck_preferences, en_gpt_deck_preferences, jp_gpt_deck_preferences, labels=['Humans', 'ChatGPT 4.1 (EN)', 'ChatGPT 4.1 (JP)'], save_path=path.parents[2] / "src" / "1_descriptives" / "plots" / "deck_preferences.png")
 
 
 

@@ -34,12 +34,12 @@ def calculate_deck_switches(data):
 
     return deck_switch_prop
 
-def plot_deck_switch_with_confidence(data1, data2, labels, window_size=10, save_path=None):
+def plot_deck_switch_with_confidence(data1, data2, data3, labels, window_size=10, save_path=None):
     # Create a plot
     fig, ax = plt.subplots(figsize=(10, 8))
 
     # Define colors
-    colors = ["#52993C", "#3C5299"]
+    colors = ["#52993C", "#3C5299", "#99523C"]
     alpha = 0.3  # Transparency for confidence interval
 
     # set x-axis ticks to every 10th trial
@@ -52,7 +52,7 @@ def plot_deck_switch_with_confidence(data1, data2, labels, window_size=10, save_
     ax.grid(color='grey', linestyle='-', linewidth=0.25, alpha=0.5)
 
     lines = []  # To store line objects for legend
-    for i, data in enumerate([data1, data2]):
+    for i, data in enumerate([data1, data2, data3]):
         # Apply smoothing
         smooth_data = data['deck_switch'].rolling(window=window_size, min_periods=1).mean()
         std_error = data['deck_switch'].rolling(window=window_size, min_periods=1).std()
@@ -84,21 +84,25 @@ def main():
     data_path = path.parents[2] / "data" / "final_data"
 
     # load both final datasets
-    hc_data = pd.read_csv(data_path / "clean_gpt.csv")
-    gpt_data = pd.read_csv(data_path / "clean_ahn_hc.csv")
+    ahn_data = pd.read_csv(data_path / "clean_ahn_hc.csv")
+    en_gpt_data = pd.read_csv(data_path / "clean_gpt_EN.csv")
+    jp_gpt_data = pd.read_csv(data_path / "clean_gpt_JP.csv")
 
     # calculate deck switches for both datasets
-    hc_deck_switch_prop = calculate_deck_switches(hc_data)
-    gpt_deck_switch_prop = calculate_deck_switches(gpt_data)
+    ahn_deck_switch_group = calculate_deck_switches(ahn_data)
+    en_deck_switch_group = calculate_deck_switches(en_gpt_data)
+    jp_deck_switch_group = calculate_deck_switches(jp_gpt_data)
 
     # Set font
     set_font()
 
     # plot deck switches for both datasets
-    plot_deck_switch_with_confidence(hc_deck_switch_prop, gpt_deck_switch_prop, ["Humans", "ChatGPT"], save_path=path.parents[2] / "src" / "descriptives" / "plots" / "deck_switches.png")
+    plot_deck_switch_with_confidence(ahn_deck_switch_group, en_deck_switch_group, jp_deck_switch_group, ["Humans", "ChatGPT 4.1 (EN)", "ChatGPT 4.1 (JP)"], save_path=path.parents[2] / "src" / "1_descriptives" / "plots" / "deck_switches.png")
 
 
-    print(hc_deck_switch_prop)
+    print(ahn_deck_switch_group)
+    print(en_deck_switch_group)
+    print(jp_deck_switch_group)
 
 
 

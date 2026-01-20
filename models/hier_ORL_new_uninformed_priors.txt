@@ -1,0 +1,150 @@
+model {
+  # ============================================================================
+  # GROUP-LEVEL PRIORS (Hyperparameters)
+  # ============================================================================
+  
+  # Learning rates (bounded to [0,1])
+  mu_a_rew ~ dnorm(0, 1)T(0, 1)
+  mu_a_pun ~ dnorm(0, 1)T(0, 1)
+  
+  # Decay parameter (positive)
+  mu_K ~ dnorm(0, 1)T(0, )
+  
+  # Temperature/inverse sensitivity (bounded, using uniform for stability)
+  mu_theta ~ dunif(0, 3)
+  
+  # Frequency and perseveration weights (can be negative)
+  mu_omega_f ~ dnorm(0, 1)
+  mu_omega_p ~ dnorm(0, 1)
+  
+  # ============================================================================
+  # PRECISION PARAMETERS (Lambda = 1/variance)
+  # Using more informed priors for better convergence
+  # ============================================================================
+  
+  lambda_a_rew ~ dgamma(1.25, 0.005)
+  lambda_a_pun ~ dgamma(1.25, 0.005)
+  lambda_K ~ dgamma(1.25, 0.005)
+  lambda_theta ~ dgamma(1.25, 0.005)
+  lambda_omega_f ~ dgamma(1.25, 0.005)
+  lambda_omega_p ~ dgamma(1.25, 0.005)
+  
+  # ============================================================================
+  # SUBJECT-LEVEL PARAMETERS
+  # ============================================================================
+  
+  for (s in 1:nsubs) {
+    
+    # Individual parameters with appropriate bounds
+    a_rew[s] ~ dnorm(mu_a_rew, lambda_a_rew)T(0, 1)
+    a_pun[s] ~ dnorm(mu_a_pun, lambda_a_pun)T(0, 1)
+    K[s] ~ dnorm(mu_K, lambda_K)T(0, )
+    theta[s] ~ dnorm(mu_theta, lambda_theta)T(0, 5)
+    omega_f[s] ~ dnorm(mu_omega_f, lambda_omega_f)
+    omega_p[s] ~ dnorm(mu_omega_p, lambda_omega_p)
+    
+    # ========================================================================
+    # INITIALIZE TRIAL 1 VALUES
+    # ========================================================================
+    
+    # Expected values for each deck
+    Ev[s, 1, 1] <- 0
+    Ev[s, 1, 2] <- 0
+    Ev[s, 1, 3] <- 0
+    Ev[s, 1, 4] <- 0
+    
+    # Expected frequencies
+    Ef[s, 1, 1] <- 0
+    Ef[s, 1, 2] <- 0
+    Ef[s, 1, 3] <- 0
+    Ef[s, 1, 4] <- 0
+    
+    # Perseveration strength
+    PS[s, 1, 1] <- 1
+    PS[s, 1, 2] <- 1
+    PS[s, 1, 3] <- 1
+    PS[s, 1, 4] <- 1
+    
+    # Choice probabilities (uniform at start)
+    p[s, 1, 1] <- 0.25
+    p[s, 1, 2] <- 0.25
+    p[s, 1, 3] <- 0.25
+    p[s, 1, 4] <- 0.25
+    
+    # ========================================================================
+    # TRIAL-BY-TRIAL UPDATE LOOP
+    # ========================================================================
+    
+    for (t in 2:ntrials[s]) {
+      
+      # Get sign of previous payoff (-1 for loss, +1 for gain)
+      signX[s, t] <- ifelse(X[s, t-1] < 0, -1, 1)
+      
+      # ----------------------------------------------------------------------
+      # UPDATE ALL FOUR DECKS
+      # ----------------------------------------------------------------------
+      
+      for (d in 1:4) {
+        
+        # ---- Update Expected Values (Ev) ----
+        # Use reward learning rate for gains, punishment rate for losses
+        Ev_update[s, t, d] <- ifelse(X[s, t-1] >= 0,
+          Ev[s, t-1, d] + a_rew[s] * (X[s, t-1] - Ev[s, t-1, d]), 
+          Ev[s, t-1, d] + a_pun[s] * (X[s, t-1] - Ev[s, t-1, d])
+        )
+        
+        # Only update chosen deck
+        Ev[s, t, d] <- ifelse(d == x[s, t-1], Ev_update[s, t, d], Ev[s, t-1, d])
+        
+        # ---- Update Expected Frequencies (Ef) ----
+        # For chosen deck
+        Ef_cho[s, t, d] <- ifelse(X[s, t-1] >= 0, 
+          Ef[s, t-1, d] + a_rew[s] * (signX[s, t] - Ef[s, t-1, d]),
+          Ef[s, t-1, d] + a_pun[s] * (signX[s, t] - Ef[s, t-1, d])
+        )
+        
+        # For unchosen decks (reversal learning)
+        Ef_not[s, t, d] <- ifelse(X[s, t-1] >= 0, 
+          Ef[s, t-1, d] + a_pun[s] * (-(signX[s, t]/3) - Ef[s, t-1, d]),
+          Ef[s, t-1, d] + a_rew[s] * (-(signX[s, t]/3) - Ef[s, t-1, d])
+        )
+        
+        # Apply appropriate update
+        Ef[s, t, d] <- ifelse(d == x[s, t-1], Ef_cho[s, t, d], Ef_not[s, t, d])
+        
+        # ---- Update Perseveration Strength (PS) ----
+        PS[s, t, d] <- ifelse(x[s, t-1] == d, 
+          1 / (1 + K[s]), 
+          PS[s, t-1, d] / (1 + K[s])
+        )
+        
+        # ---- Calculate Total Value for each deck ----
+        V[s, t, d] <- Ev[s, t, d] + Ef[s, t, d] * omega_f[s] + PS[s, t, d] * omega_p[s]
+        
+      } # End deck loop
+      
+      # ----------------------------------------------------------------------
+      # SOFTMAX CHOICE RULE WITH NUMERICAL STABILIZATION
+      # ----------------------------------------------------------------------
+      
+      # Find maximum value for numerical stability
+      max_V[s, t] <- max(V[s, t, ])
+      
+      # Calculate exp(theta * (V - max_V)) for each deck
+      for (d in 1:4) {
+        exp_p[s, t, d] <- exp(theta[s] * (V[s, t, d] - max_V[s, t]))
+      }
+      
+      # Calculate choice probabilities via softmax
+      for (d in 1:4) {
+        p[s, t, d] <- exp_p[s, t, d] / sum(exp_p[s, t, ])
+      }
+      
+      # Sample choice from categorical distribution
+      x[s, t] ~ dcat(p[s, t, ])
+      
+    } # End trial loop
+    
+  } # End subject loop
+  
+}

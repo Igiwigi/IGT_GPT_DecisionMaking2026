@@ -4,14 +4,15 @@ model {
   mu_a_pun ~ dnorm(0,1)T(0,1)
   mu_K ~ dnorm(0,1)T(0,)
   #mu_theta ~ dnorm(0,1)T(0,) #truncating can confuse it with no upper bound
-  mu_theta ~ dnorm(0,1)T(0,5)
+  #mu_theta ~ dnorm(0,1)T(0,5)
+  mu_theta ~ dunif(0, 3)
   mu_omega_f ~ dnorm(0,1)
   mu_omega_p ~ dnorm(0,1)
 
   lambda_a_rew ~ dgamma(.01,.01)
   lambda_a_pun ~ dgamma(.01,.01)
   lambda_K ~ dgamma(.01,.01)
-  lambda_theta ~ dgamma(.01,.01)
+  #lambda_theta ~ dgamma(.01,.01)
   lambda_omega_f ~ dgamma(.01,.01)
   lambda_omega_p ~ dgamma(.01,.01)
   
@@ -19,7 +20,7 @@ model {
   #lambda_a_rew ~ dgamma(2.5/2,.01/2)
   #lambda_a_pun ~ dgamma(2.5/2,.01/2)
   #lambda_K ~ dgamma(2.5/2,.01/2)
-  #lambda_theta ~ dgamma(2.5/2,.01/2)
+  lambda_theta ~ dgamma(2.5/2,.01/2)
   #lambda_omega_f ~ dgamma(2.5/2,.01/2)
   #lambda_omega_p ~ dgamma(2.5/2,.01/2)
   
@@ -29,7 +30,7 @@ model {
     a_pun[s] ~ dnorm(mu_a_pun,lambda_a_pun)
     K[s]  ~ dnorm(mu_K,lambda_K)
     #theta[s] ~ dnorm(mu_theta,lambda_theta) # set to 1 in order to simplify model
-    theta[s] ~ dnorm(mu_theta,lambda_theta)T(0,5)
+	theta[s] ~ dnorm(mu_theta, lambda_theta)T(0, 5)
     omega_f[s] ~ dnorm(mu_omega_f,lambda_omega_f)
     omega_p[s] ~ dnorm(mu_omega_p,lambda_omega_p)
   

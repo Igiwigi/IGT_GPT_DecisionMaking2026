@@ -1,3 +1,5 @@
+#still issues with theta!!
+
 #install.packages("pacman")
 pacman::p_load(R2jags, parallel)
 
@@ -14,7 +16,7 @@ groups <- c("ahn_hc", "gpt_EN", "gpt_JP")
 fixed_theta <- FALSE # if FALSE then theta is estimated (included in params and a different model file is used)
 model_tag <- ifelse(fixed_theta, "fixedTheta", "freeTheta") #to know which
 
-# change the root path according to your needs (i.e., where the ChatGPT-IGT folder is located)
+# change the root path according to your needs (i.e., where the main folder is located)
 #root_path <- "~/Desktop/dm-code" # personal comp
 #root_path <- "dm-code" # UCloud
 
@@ -68,7 +70,7 @@ if (fixed_theta) {
   model_file <- file.path(root_path, "models", "hier_ORL_fixed_theta.txt")
 } else {
   params<-c("mu_a_rew","mu_a_pun","mu_K","mu_theta","mu_omega_f","mu_omega_p","deviance") 
-  model_file <- file.path(root_path, "models", "hier_ORL.txt")
+  model_file <- file.path(root_path, "models", "hier_ORL_new_uninformed_priors.txt") #testing a new hier ORL! (less overflow, still uninformed priors)
 }
 
 # set timer
@@ -85,6 +87,10 @@ samples <- jags.parallel(jags_data, inits=NULL, params,
 
 end_time <- Sys.time()
 print(paste("Runtime:", end_time - start_time, "took this long :)"))
+
+#check if NA's
+print(any(is.na(samples$BUGSoutput$sims.list$mu_theta)))
+print(any(is.infinite(samples$BUGSoutput$sims.list$mu_theta)))
 
 #doesnt print with bad deviance
 if(fixed_theta) {

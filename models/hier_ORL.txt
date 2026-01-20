@@ -3,7 +3,8 @@ model {
   mu_a_rew ~ dnorm(0,1)T(0,1)
   mu_a_pun ~ dnorm(0,1)T(0,1)
   mu_K ~ dnorm(0,1)T(0,)
-  mu_theta ~ dnorm(0,1)T(0,)
+  #mu_theta ~ dnorm(0,1)T(0,) #truncating can confuse it with no upper bound
+  mu_theta ~ dnorm(0,1)T(0,5)
   mu_omega_f ~ dnorm(0,1)
   mu_omega_p ~ dnorm(0,1)
 
@@ -27,7 +28,8 @@ model {
     a_rew[s] ~ dnorm(mu_a_rew,lambda_a_rew)
     a_pun[s] ~ dnorm(mu_a_pun,lambda_a_pun)
     K[s]  ~ dnorm(mu_K,lambda_K)
-    theta[s] ~ dnorm(mu_theta,lambda_theta) # set to 1 in order to simplify model
+    #theta[s] ~ dnorm(mu_theta,lambda_theta) # set to 1 in order to simplify model
+    theta[s] ~ dnorm(mu_theta,lambda_theta)T(0,5)
     omega_f[s] ~ dnorm(mu_omega_f,lambda_omega_f)
     omega_p[s] ~ dnorm(mu_omega_p,lambda_omega_p)
   

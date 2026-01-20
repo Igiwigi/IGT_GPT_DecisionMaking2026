@@ -11,7 +11,7 @@ set.seed(2502)
 groups <- c("ahn_hc", "gpt_EN", "gpt_JP")
 
 ### SECTION WHERE YOU CAN CHANGE THINGS ###
-fixed_theta <- TRUE # if FALSE then theta is estimated (included in params and a different model file is used)
+fixed_theta <- FALSE # if FALSE then theta is estimated (included in params and a different model file is used)
 model_tag <- ifelse(fixed_theta, "fixedTheta", "freeTheta") #to know which
 
 # change the root path according to your needs (i.e., where the ChatGPT-IGT folder is located)
@@ -76,18 +76,22 @@ start_time = Sys.time()
 # run jags model
 print("Intializing JAGS ...")
 print(paste("Running model:", model_tag, "| Group:", group_name))
-print(start_time)
 
-#running the model for longer (more iters) so more convergences (though likely structural issues)
-
+#can maybe run the model for longer iters (though likely structural issues)
 #test n.iter 10000 later with n.burnin 3000
 samples <- jags.parallel(jags_data, inits=NULL, params,
                          model.file = model_file,
                          n.chains=3, n.iter=3000, n.burnin=1000, n.thin=1, n.cluster=4)
 
 end_time <- Sys.time()
-print(paste("Runtime:", end_time - start_time), "took this long :)")
-print(samples$BUGSoutput)
+print(paste("Runtime:", end_time - start_time, "took this long :)"))
+
+#doesnt print with bad deviance
+if(fixed_theta) {
+  print(samples$BUGSoutput)
+} else {
+  print(samples$BUGSoutput$summary)
+}
 
 # save summary to txt file depending on group
 summary_file <- file.path(root_path, "src", "2_estimation", "results",

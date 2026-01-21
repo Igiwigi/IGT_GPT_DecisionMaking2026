@@ -18,7 +18,7 @@ model_tag <- ifelse(WSLS, "WSLS", "Softmax")
 root_path <- "~/IGT_LLM_DecisionMaking"
 
 # select group and read in data 
-group_name <- groups[2] # grp1: human, grp2: gpt_en, grp3: gpt_jp
+group_name <- groups[3] # grp1: human, grp2: gpt_en, grp3: gpt_jp
 
 ### CODE ###
 # create and load file based on group selection
@@ -114,7 +114,7 @@ traceplot(samples$BUGSoutput, ask = FALSE, mfrow = c(2, 2), varname = params)
 dev.off()
 
 # save df
-savefile <- file.path(root_path, "src", "2_estimation", "results",
+savefile <- file.path(root_path, "src", "2_estimation", "results", "simpler_models",
                       paste0("param_", model_tag, "_", group_name, ".csv"))
 
 write.csv(df, savefile)

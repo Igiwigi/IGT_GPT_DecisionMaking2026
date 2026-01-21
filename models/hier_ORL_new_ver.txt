@@ -4,19 +4,17 @@ model {
   # GROUP-LEVEL PRIORS
   ##########################################################
 
-  mu_a_rew     ~ dnorm(0, 1)
-  mu_a_pun     ~ dnorm(0, 1)
-  mu_logK      ~ dnorm(0, 1)
-  mu_logtheta  ~ dnorm(0, 1)
-  mu_omega_f   ~ dnorm(0, 1)
-  mu_omega_p   ~ dnorm(0, 1)
+  mu_a_rew    ~ dnorm(0, 1)
+  mu_a_pun    ~ dnorm(0, 1)
+  mu_logK     ~ dnorm(0, 1)
+  mu_omega_f  ~ dnorm(0, 1)
+  mu_omega_p  ~ dnorm(0, 1)
 
-  tau_a_rew     ~ dgamma(0.1, 0.1)
-  tau_a_pun     ~ dgamma(0.1, 0.1)
-  tau_logK      ~ dgamma(0.1, 0.1)
-  tau_logtheta  ~ dgamma(0.1, 0.1)
-  tau_omega_f   ~ dgamma(0.1, 0.1)
-  tau_omega_p   ~ dgamma(0.1, 0.1)
+  tau_a_rew    ~ dgamma(0.1, 0.1)
+  tau_a_pun    ~ dgamma(0.1, 0.1)
+  tau_logK     ~ dgamma(0.1, 0.1)
+  tau_omega_f  ~ dgamma(0.1, 0.1)
+  tau_omega_p  ~ dgamma(0.1, 0.1)
 
   ##########################################################
   # SUBJECT-LEVEL PARAMETERS (non-centered)
@@ -24,21 +22,19 @@ model {
 
   for (s in 1:nsubs) {
 
-    # Standard normal deviations for non-centered parameterization
-    z_a_rew[s]    ~ dnorm(0, 1)
-    z_a_pun[s]    ~ dnorm(0, 1)
-    z_logK[s]     ~ dnorm(0, 1)
-    z_logtheta[s] ~ dnorm(0, 1)
-    z_omega_f[s]  ~ dnorm(0, 1)
-    z_omega_p[s]  ~ dnorm(0, 1)
+    z_a_rew[s]   ~ dnorm(0, 1)
+    z_a_pun[s]   ~ dnorm(0, 1)
+    z_logK[s]    ~ dnorm(0, 1)
+    z_omega_f[s] ~ dnorm(0, 1)
+    z_omega_p[s] ~ dnorm(0, 1)
 
-    # Transformations
-    a_rew[s]    <- ilogit(mu_a_rew + z_a_rew[s] / sqrt(tau_a_rew))
-    a_pun[s]    <- ilogit(mu_a_pun + z_a_pun[s] / sqrt(tau_a_pun))
-    K[s]        <- exp(mu_logK + z_logK[s] / sqrt(tau_logK))
-    theta[s]    <- exp(mu_logtheta + z_logtheta[s] / sqrt(tau_logtheta))
-    omega_f[s]  <- mu_omega_f + z_omega_f[s] / sqrt(tau_omega_f)
-    omega_p[s]  <- mu_omega_p + z_omega_p[s] / sqrt(tau_omega_p)
+    a_rew[s]   <- ilogit(mu_a_rew + z_a_rew[s] / sqrt(tau_a_rew))
+    a_pun[s]   <- ilogit(mu_a_pun + z_a_pun[s] / sqrt(tau_a_pun))
+    K[s]       <- exp(mu_logK + z_logK[s] / sqrt(tau_logK))
+    omega_f[s] <- mu_omega_f + z_omega_f[s] / sqrt(tau_omega_f)
+    omega_p[s] <- mu_omega_p + z_omega_p[s] / sqrt(tau_omega_p)
+
+    theta[s] <- 1   # FIXED
   }
 
   ##########################################################
@@ -47,7 +43,6 @@ model {
 
   for (s in 1:nsubs) {
 
-    # ----- Initialize trial 1 -----
     for (d in 1:4) {
       Ev[s,1,d] <- 0
       Ef[s,1,d] <- 0
@@ -55,62 +50,58 @@ model {
       p[s,1,d]  <- 0.25
     }
 
-    # ----- Loop over trials -----
     for (t in 2:ntrials[s]) {
 
       signX[s,t] <- ifelse(X[s,t-1] < 0, -1, 1)
 
       for (d in 1:4) {
 
-        # ----- Expected value update -----
         Ev_update[s,t,d] <- ifelse(
           X[s,t-1] >= 0,
           Ev[s,t-1,d] + a_rew[s] * (X[s,t-1] - Ev[s,t-1,d]),
           Ev[s,t-1,d] + a_pun[s] * (X[s,t-1] - Ev[s,t-1,d])
         )
-        Ev[s,t,d] <- ifelse(d == x[s,t-1],
-                             Ev_update[s,t,d],
-                             Ev[s,t-1,d])
 
-        # ----- Frequency update -----
+        Ev[s,t,d] <- ifelse(d == x[s,t-1],
+                            Ev_update[s,t,d],
+                            Ev[s,t-1,d])
+
         Ef_cho[s,t,d] <- ifelse(
           X[s,t-1] >= 0,
           Ef[s,t-1,d] + a_rew[s] * (signX[s,t] - Ef[s,t-1,d]),
           Ef[s,t-1,d] + a_pun[s] * (signX[s,t] - Ef[s,t-1,d])
         )
+
         Ef_not[s,t,d] <- ifelse(
           X[s,t-1] >= 0,
           Ef[s,t-1,d] + a_pun[s] * (-(signX[s,t]/3) - Ef[s,t-1,d]),
           Ef[s,t-1,d] + a_rew[s] * (-(signX[s,t]/3) - Ef[s,t-1,d])
         )
-        Ef[s,t,d] <- ifelse(d == x[s,t-1],
-                             Ef_cho[s,t,d],
-                             Ef_not[s,t,d])
 
-        # ----- Perseveration -----
+        Ef[s,t,d] <- ifelse(d == x[s,t-1],
+                            Ef_cho[s,t,d],
+                            Ef_not[s,t,d])
+
         PS[s,t,d] <- ifelse(
           x[s,t-1] == d,
           1 / (1 + K[s]),
           PS[s,t-1,d] / (1 + K[s])
         )
 
-        # ----- Valence -----
-        V[s,t,d] <- Ev[s,t,d] + omega_f[s]*Ef[s,t,d] + omega_p[s]*PS[s,t,d]
+        V[s,t,d] <- Ev[s,t,d] +
+                    omega_f[s] * Ef[s,t,d] +
+                    omega_p[s] * PS[s,t,d]
+      }
 
-      } # end deck loop
-
-      # ----- Softmax with stabilization -----
       max_V[s,t] <- max(V[s,t,])
       for (d in 1:4) {
-        exp_p[s,t,d] <- exp(theta[s] * (V[s,t,d] - max_V[s,t]))
+        exp_p[s,t,d] <- exp(V[s,t,d] - max_V[s,t])
       }
       for (d in 1:4) {
         p[s,t,d] <- exp_p[s,t,d] / sum(exp_p[s,t,])
       }
 
-      # ----- Choice likelihood -----
       x[s,t] ~ dcat(p[s,t,])
-
-    } # end trial loop
-  } # end subject loop
-} # end model
+    }
+  }
+}

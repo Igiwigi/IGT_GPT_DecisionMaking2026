@@ -30,7 +30,7 @@ model {
     a_pun[s] ~ dnorm(mu_a_pun,lambda_a_pun)
     K[s]  ~ dnorm(mu_K,lambda_K)
     #theta[s] ~ dnorm(mu_theta,lambda_theta) # set to 1 in order to simplify model
-	theta[s] ~ dnorm(mu_theta, lambda_theta)T(0, 5)
+    theta[s] ~ dnorm(mu_theta, lambda_theta)T(0, 5)
     omega_f[s] ~ dnorm(mu_omega_f,lambda_omega_f)
     omega_p[s] ~ dnorm(mu_omega_p,lambda_omega_p)
   

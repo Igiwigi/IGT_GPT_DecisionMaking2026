@@ -1,4 +1,5 @@
-#still issues with theta!!
+#still issues with theta (when unfixed)!! 
+#given that it's a poor fit for our LLM data anyway, maybe leave freetheta unfinished?
 
 #install.packages("pacman")
 pacman::p_load(R2jags, parallel)
@@ -6,19 +7,12 @@ pacman::p_load(R2jags, parallel)
 # set seed
 set.seed(2502)
 
-# overview of all groups that can be run 
-#groups <- c("gpt", "ahn_hc", "ahn_hc_1", "ahn_hc_2", "ahn_hc_3", "ahn_hc_4")
-
-#dont need to use the extra sample groups (yet)
+#set data grps
 groups <- c("ahn_hc", "gpt_EN", "gpt_JP")
 
 ### SECTION WHERE YOU CAN CHANGE THINGS ###
 fixed_theta <- FALSE # if FALSE then theta is estimated (included in params and a different model file is used)
 model_tag <- ifelse(fixed_theta, "fixedTheta", "freeTheta") #to know which
-
-# change the root path according to your needs (i.e., where the main folder is located)
-#root_path <- "~/Desktop/dm-code" # personal comp
-#root_path <- "dm-code" # UCloud
 
 #new root path (name the code folder this)
 root_path <- "~/IGT_LLM_DecisionMaking"
@@ -69,35 +63,33 @@ if (fixed_theta) {
   params<-c("mu_a_rew","mu_a_pun","mu_K","mu_omega_f","mu_omega_p","deviance") 
   model_file <- file.path(root_path, "models", "hier_ORL_fixed_theta.txt")
 } else {
-  params<-c("mu_a_rew","mu_a_pun","mu_K","mu_theta","mu_omega_f","mu_omega_p","deviance") 
-  model_file <- file.path(root_path, "models", "hier_ORL_new_uninformed_priors.txt") #testing a new hier ORL! (less overflow, still uninformed priors)
+  params<-c("mu_a_rew","mu_a_pun","mu_logK","mu_logtheta","mu_omega_f","mu_omega_p","deviance")
+  model_file <- file.path(root_path, "models", "hier_ORL_new_ver.txt") 
+  #testing a new hier ORL! (less theta issues, hopefully)
 }
 
 # set timer
 start_time = Sys.time()
+
 # run jags model
 print("Intializing JAGS ...")
 print(paste("Running model:", model_tag, "| Group:", group_name))
 
-#can maybe run the model for longer iters (though likely structural issues)
-#test n.iter 10000 later with n.burnin 3000
+#can maybe run the model for longer iters (in case it helos)
+#test n.iter 10000 later with n.burnin 3000 (though idk if that will fix issues necessarily)
 samples <- jags.parallel(jags_data, inits=NULL, params,
                          model.file = model_file,
                          n.chains=3, n.iter=3000, n.burnin=1000, n.thin=1, n.cluster=4)
 
+#samples <- jags.parallel(jags_data, inits=NULL, params,
+#                         model.file = model_file,
+#                         n.chains=3, n.iter=10000, n.burnin=3000, n.thin=2, n.cluster=4)
+
 end_time <- Sys.time()
 print(paste("Runtime:", end_time - start_time, "took this long :)"))
 
-#check if NA's
-print(any(is.na(samples$BUGSoutput$sims.list$mu_theta)))
-print(any(is.infinite(samples$BUGSoutput$sims.list$mu_theta)))
-
 #doesnt print with bad deviance
-if(fixed_theta) {
-  print(samples$BUGSoutput)
-} else {
-  print(samples$BUGSoutput$summary)
-}
+print(samples$BUGSoutput$summary)
 
 # save summary to txt file depending on group
 summary_file <- file.path(root_path, "src", "2_estimation", "results",
@@ -105,14 +97,23 @@ summary_file <- file.path(root_path, "src", "2_estimation", "results",
 
 write.table(samples$BUGSoutput$summary, summary_file)
 
-# extact mu parameters
+# extract mu parameters
 Y <- samples$BUGSoutput$sims.list
 mu_a_rew <- Y$mu_a_rew
 mu_a_pun <- Y$mu_a_pun
-mu_K <- Y$mu_K
-if (!fixed_theta) {
-  mu_theta <- Y$mu_theta
+
+if (fixed_theta) {
+  # For fixed theta model, mu_K is directly available
+  mu_K <- Y$mu_K
+} else {
+  # For free theta model, extract log-scale parameters and transform to natural scale
+  mu_logK <- Y$mu_logK
+  mu_K <- exp(mu_logK)
+  
+  mu_logtheta <- Y$mu_logtheta
+  mu_theta <- exp(mu_logtheta)
 }
+
 mu_omega_f <- Y$mu_omega_f
 mu_omega_p <- Y$mu_omega_p
 
@@ -127,8 +128,8 @@ dev.off()
 if (fixed_theta) {
   df <- data.frame(mu_a_rew, mu_a_pun, mu_K, mu_omega_f, mu_omega_p)
 } else {
- df <- data.frame(mu_a_rew, mu_a_pun, mu_K, mu_theta, mu_omega_f, mu_omega_p)}
-
+  df <- data.frame(mu_a_rew, mu_a_pun, mu_K, mu_theta, mu_omega_f, mu_omega_p)
+}
 
 # save df (if it is an extra sample e.g., ahn_hc_3, then save to the "extra_samples" folder within results)
 savefile <- file.path(root_path, "src", "2_estimation", "results",

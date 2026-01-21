@@ -1,0 +1,40 @@
+model {
+  # Priors
+  # prob_stay_win: probability of staying with same choice after a win
+  prob_stay_win ~ dunif(0, 1)
+  
+  # prob_stay_lose: probability of staying with same choice after a loss
+  prob_stay_lose ~ dunif(0, 1)
+  
+  # epsilon: random exploration parameter (probability of random choice)
+  epsilon ~ dunif(0, 1)
+  
+  # Initialize first trial - equal probabilities for all decks
+  p[1, 1] <- 0.25
+  p[1, 2] <- 0.25
+  p[1, 3] <- 0.25
+  p[1, 4] <- 0.25
+  
+  # Loop through trials starting from trial 2
+  for (t in 2:ntrials) {
+    
+    # Determine if previous outcome was a win or loss
+    is_win[t] <- ifelse(X[t-1] >= 0, 1, 0)
+    
+    # Determine stay probability based on previous outcome
+    stay_prob[t] <- ifelse(is_win[t] == 1, prob_stay_win, prob_stay_lose)
+    
+    # Calculate choice probabilities for each deck
+    for (d in 1:4) {
+      
+      # If this was the previously chosen deck
+      if_stayed[t, d] <- ifelse(d == x[t-1], stay_prob[t], (1 - stay_prob[t]) / 3)
+      
+      # Mix with random exploration
+      p[t, d] <- (1 - epsilon) * if_stayed[t, d] + epsilon * 0.25
+    }
+    
+    # Sample choice from categorical distribution
+    x[t] ~ dcat(p[t, ])
+  }
+}

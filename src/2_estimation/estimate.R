@@ -1,6 +1,4 @@
-#still issues with theta (when unfixed), likely doesnt work as it should, and likely will not be fixed as it will not be used!! 
-#given that it's a poor fit for our LLM data anyway, leaving free theta unfinished (it doesnt quite work as it should, though it did... for a moment.)
-#likely would need better inits for a theta model (so init values cant ruin it) & bad rhat anyway
+#given that it's a poor fit for our LLM data, leaving free theta unfinished (it doesnt quite work as it should, though it did... for a moment?)
 
 #we care about group level estimates and subject variability!!!!
 
@@ -8,7 +6,7 @@
 pacman::p_load(R2jags, parallel)
 
 # set seed
-set.seed(2502)
+set.seed(1234)
 
 #set data grps
 groups <- c("ahn_hc", "gpt_EN", "gpt_JP")
@@ -61,7 +59,7 @@ for (s in 1:nsubs) {
 X <- X/100
 
 # set up jags and run jags model
-jags_data <- list("x","X","ntrials","nsubs") 
+jags_data <- list("x","X","ntrials","nsubs")
 if (fixed_theta) {
   params <- c("mu_a_rew", "mu_a_pun", "mu_K", "mu_omega_f", "mu_omega_p",
               "sigma_a_rew", "sigma_a_pun", "sigma_K", "sigma_omega_f", "sigma_omega_p",
@@ -77,33 +75,60 @@ if (fixed_theta) {
   #will not be using in the end
 }
 
+#set some inits so the chains dont mix poorly
+inits <- function() {
+  list(
+    mu_a_rew = rnorm(1, -1.5, 0.3),
+    mu_a_pun = rnorm(1, -2.5, 0.3),
+    mu_K = rnorm(1, 0, 0.3),
+    mu_omega_f = rnorm(1, 0, 0.5),
+    mu_omega_p = rnorm(1, 0, 0.5),
+    
+    sigma_a_rew = runif(1, 0.3, 0.8),
+    sigma_a_pun = runif(1, 0.3, 0.8),
+    sigma_K = runif(1, 0.3, 0.8),
+    sigma_omega_f = runif(1, 0.5, 1.5),
+    sigma_omega_p = runif(1, 0.5, 1.5),
+    
+    z_a_rew = rnorm(nsubs, 0, 0.5),
+    z_a_pun = rnorm(nsubs, 0, 0.5),
+    z_K = rnorm(nsubs, 0, 0.5),
+    z_of = rnorm(nsubs, 0, 0.5),
+    z_op = rnorm(nsubs, 0, 0.5)
+  )
+}
+
 # set timer
 start_time = Sys.time()
+print(start_time, "this is when this started running!") #too lazy to fix it to the right timezone
 
 # run jags model
 print("Intializing JAGS ...")
 print(paste("Running model:", model_tag, "| Group:", group_name))
 
-#doing high iter to make up for having little data (16 participants)
-samples <- jags.parallel(jags_data, inits=NULL, params,
+#doing high iter. to make up for having little data... (16 participants)
+samples <- jags.parallel(jags_data, inits=inits, params,
                          model.file = model_file,
-                         n.chains=3, n.iter=20000, n.burnin=8000, n.thin=5, n.cluster=4)
+                         n.chains=3, n.iter=20000, n.burnin=8000, n.thin=5, n.cluster=4, jags.seed = 1234)
 
+#what was here originally
 #samples <- jags.parallel(jags_data, inits=NULL, params,
 #                         model.file = model_file,
 #                         n.chains=3, n.iter=3000, n.burnin=1000, n.thin=1, n.cluster=4)
 
-end_time <- Sys.time()
-print(paste("Runtime:", end_time - start_time, "took this long :)"))
-
-#doesnt print with bad deviance
+#doesnt print with bad deviance (if doesnt converge)
 print(samples$BUGSoutput$summary)
+print(samples$BUGSoutput$DIC)
 
 # save summary to txt file depending on group
 summary_file <- file.path(root_path, "src", "2_estimation", "results",
-                          paste0("summary_", model_tag, "_", group_name, ".txt"))
-
+                          paste0("summary_grouplevel_", model_tag, "_", group_name, ".txt"))
 write.table(samples$BUGSoutput$summary, summary_file)
+
+# save DIC to separate file
+dic_file <- file.path(root_path, "src", "2_estimation", "results",
+                      paste0("DIC_grouplevel_", model_tag, "_", group_name, ".txt"))
+write.table(samples$BUGSoutput$DIC, dic_file)
 
 # extract group-level parameters (means and SDs)
 Y <- samples$BUGSoutput$sims.list
@@ -141,7 +166,7 @@ plotfile <- file.path(root_path, "src", "2_estimation", "plots", "traceplots",
                       paste0("trace_", model_tag, "_", group_name, ".png"))
 
 # Calculate appropriate grid dimensions based on number of parameters (since it varies)
-n_params <- length(params)
+n_params <- length(params) - 1 #exclude deviance
 n_cols <- 2
 n_rows <- ceiling(n_params / n_cols)
 

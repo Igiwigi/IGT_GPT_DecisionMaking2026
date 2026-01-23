@@ -5,7 +5,7 @@
 pacman::p_load(R2jags, parallel)
 
 # set seed
-set.seed(2502)
+set.seed(1234)
 
 # set data groups
 groups <- c("ahn_hc", "gpt_EN", "gpt_JP")
@@ -18,7 +18,7 @@ model_tag <- ifelse(WSLS, "WSLS", "Softmax")
 root_path <- "~/IGT_LLM_DecisionMaking"
 
 # select group and read in data 
-group_name <- groups[3] # grp1: human, grp2: gpt_en, grp3: gpt_jp
+group_name <- groups[1] # grp1: human, grp2: gpt_en, grp3: gpt_jp
 
 ### CODE ###
 # create and load file based on group selection
@@ -75,10 +75,11 @@ start_time <- Sys.time()
 print("Initializing JAGS ...")
 print(paste("Running model:", model_tag, "| Group:", group_name))
 
+#might be overkill for a simple model
 samples <- jags.parallel(jags_data, inits = NULL, params,
                          model.file = model_file,
-                         n.chains = 3, n.iter = 3000, n.burnin = 1000, 
-                         n.thin = 1, n.cluster = 4)
+                         n.chains = 3, n.iter = 10000, n.burnin = 2000, 
+                         n.thin = 2, n.cluster = 4, jags.seed = 1234)
 
 end_time <- Sys.time()
 print(paste("Runtime:", end_time - start_time))
@@ -107,7 +108,7 @@ if (WSLS) {
 }
 
 # plot traceplots
-plotfile <- file.path(root_path, "src", "2_estimation", "plots", "traceplots",
+plotfile <- file.path(root_path, "src", "2_estimation", "plots", "traceplots", "simpler_models",
                       paste0("trace_", model_tag, "_", group_name, ".png"))
 png(plotfile, width = 2500, height = 2500, res = 400)
 traceplot(samples$BUGSoutput, ask = FALSE, mfrow = c(2, 2), varname = params)
@@ -118,6 +119,11 @@ savefile <- file.path(root_path, "src", "2_estimation", "results", "simpler_mode
                       paste0("param_", model_tag, "_", group_name, ".csv"))
 
 write.csv(df, savefile)
+
+# save DIC to separate file
+dic_file <- file.path(root_path, "src", "2_estimation", "results", "simpler_models",
+                      paste0("DIC_grouplevel_", model_tag, "_", group_name, ".txt"))
+write.table(samples$BUGSoutput$DIC, dic_file)
 
 # print final runtime
 print(paste("Total runtime:", end_time - start_time))

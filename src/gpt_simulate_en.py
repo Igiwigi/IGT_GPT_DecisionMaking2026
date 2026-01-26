@@ -16,7 +16,7 @@ def input_parse():
     parser = argparse.ArgumentParser(description='Run the GPT simulation')
 
     parser.add_argument("-other", "--other_letters", help='If specified, use other deck names (E, F, G, H)', action="store_true")
-    parser.add_argument("-nudge", "--nudge_choices", help='Whether to use nudging parameters', action="store_true") #this goes unused; only there if "less ideal" (noisier!) decision-making is desired from the model
+    parser.add_argument("-nudge", "--nudge_choices", help='Whether to use nudging parameters', action="store_true")
 
     return parser.parse_args()
 

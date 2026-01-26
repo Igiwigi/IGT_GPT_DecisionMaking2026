@@ -85,24 +85,24 @@ def main():
 
     # load both final datasets
     ahn_data = pd.read_csv(data_path / "clean_ahn_hc.csv")
-    en_gpt_data = pd.read_csv(data_path / "clean_gpt_EN.csv")
-    jp_gpt_data = pd.read_csv(data_path / "clean_gpt_JP.csv")
+    gpt_data_new = pd.read_csv(data_path / "clean_gpt_NEW_2025.csv")
+    gpt_data_old = pd.read_csv(data_path / "clean_gpt_OLD_2023.csv")
 
     # calculate deck switches for both datasets
     ahn_deck_switch_group = calculate_deck_switches(ahn_data)
-    en_deck_switch_group = calculate_deck_switches(en_gpt_data)
-    jp_deck_switch_group = calculate_deck_switches(jp_gpt_data)
+    gpt_data_new_switch_group = calculate_deck_switches(gpt_data_new)
+    gpt_data_old_switch_group = calculate_deck_switches(gpt_data_old)
 
     # Set font
     set_font()
 
     # plot deck switches for both datasets
-    plot_deck_switch_with_confidence(ahn_deck_switch_group, en_deck_switch_group, jp_deck_switch_group, ["Humans", "ChatGPT 4.1 (EN)", "ChatGPT 4.1 (JP)"], save_path=path.parents[2] / "src" / "1_descriptives" / "plots" / "deck_switches.png")
+    plot_deck_switch_with_confidence(ahn_deck_switch_group, gpt_data_old_switch_group, gpt_data_new_switch_group, ['Humans', 'ChatGPT 2023', 'ChatGPT 4.1 (2025)'], save_path=path.parents[2] / "src" / "1_descriptives" / "plots" / "deck_switches.png")
 
 
     print(ahn_deck_switch_group)
-    print(en_deck_switch_group)
-    print(jp_deck_switch_group)
+    print(gpt_data_old_switch_group)
+    print(gpt_data_new_switch_group)
 
 
 

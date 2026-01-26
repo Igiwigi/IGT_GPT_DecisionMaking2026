@@ -25,10 +25,10 @@ def prepare_ahn(data_path, filename:str="healthy_control", save_path=None):
     count = df.groupby('subjID').count()
 
     # get the last 16 subject ids in count (LESS THAN THE ORIGINAL 30, since less data for each condition)
-    last_16 = count.index[-16:]
+    last_30 = count.index[-30:]
 
     # filter df to only include last 16 subjects
-    df = df[df['subjID'].isin(last_16)].reset_index(drop=True)
+    df = df[df['subjID'].isin(last_30)].reset_index(drop=True)
 
     # drop gain and loss
     df = df.drop(columns=['gain', 'loss', 'trial'])
@@ -75,8 +75,8 @@ def create_ahn_extra_samples(data_path, n_samples=5, filename:str="healthy_contr
 
     # loop over subjects
     for i in range(n_samples):
-        # sample 16 subjects (doing less than 30 since we have less data points per subject?)
-        sample = np.random.choice(subjects, 16, replace=False)
+        # sample 30
+        sample = np.random.choice(subjects, 30, replace=False)
 
         # filter df with sample
         df_sample = df[df['subjID'].isin(sample)].reset_index(drop=True)
@@ -125,7 +125,7 @@ def load_gpt(datapath):
 
     return df
 
-def clean_gpt(gpt_df, save_path=None, japanese =False):
+def clean_gpt(gpt_df, save_path=None, OLD =False):
     '''
     Cleans GPT data by translating decks, adding outcomes, dropping unnecessary columns and renaming columns
     '''
@@ -151,10 +151,10 @@ def clean_gpt(gpt_df, save_path=None, japanese =False):
     # rename columns
     gpt_df = gpt_df.rename(columns={'deck':'x'})
 
-    if japanese:
-        gpt_df.to_csv(save_path / f"clean_gpt_JP.csv", index=False)
+    if OLD:
+        gpt_df.to_csv(save_path / f"clean_gpt_OLD_2023.csv", index=False)
     else:
-        gpt_df.to_csv(save_path / f"clean_gpt_EN.csv", index=False)
+        gpt_df.to_csv(save_path / f"clean_gpt_NEW_2025.csv", index=False)
         
     return gpt_df
     
@@ -176,15 +176,16 @@ def main():
     df_ahn = prepare_ahn(data_path = data_root / "Ahn2014", filename="healthy_control", save_path=save_path)
 
     # load gpt data
-    df_gpt_en = load_gpt(data_root / "GPTdata" / "ENGLISH")
-    df_gpt_jp = load_gpt(data_root / "GPTdata" / "JAPANESE")
+    df_gpt_en_new = load_gpt(data_root / "GPTdata" / "GPT4.1_2025") #ENGLISH gpt4 data
+    df_gpt_en_old = load_gpt(data_root / "GPTdata" / "GPT_2023") #OLD 2023 gpt3 data
 
     # translate gpt data
-    df_gpt_en = clean_gpt(df_gpt_en, save_path=save_path, japanese=False)
-    df_gpt_jp = clean_gpt(df_gpt_jp, save_path=save_path, japanese=True)
+    df_gpt_en_new = clean_gpt(df_gpt_en_new, save_path=save_path, OLD=False)
+    df_gpt_en_old = clean_gpt(df_gpt_en_old, save_path=save_path, OLD = True)
 
     # create extra samples for ahn data
     create_ahn_extra_samples(data_path = data_root / "Ahn2014", n_samples=4, filename="healthy_control", save_path=save_path)
 
 if __name__ == "__main__":
     main()
+    

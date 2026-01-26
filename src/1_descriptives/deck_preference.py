@@ -93,7 +93,7 @@ def plot_deck_preferences(data1, data2, data3, labels, window_size=10, save_path
 
     # expand y axis
     ax1.set_ylim(0, 0.5)
-    ax2.set_ylim(0, 1)
+    ax2.set_ylim(0, 0.5)
     ax3.set_ylim(0, 0.9)
     
     #limit x axis
@@ -113,20 +113,20 @@ def main():
 
     # load both final datasets
     ahn_data = pd.read_csv(data_path / "clean_ahn_hc.csv")
-    eng_gpt_data = pd.read_csv(data_path / "clean_gpt_EN.csv")
-    jp_gpt_data = pd.read_csv(data_path / "clean_gpt_JP.csv")
+    gpt_data_old = pd.read_csv(data_path / "clean_gpt_OLD_2023.csv")
+    gpt_data_new = pd.read_csv(data_path / "clean_gpt_NEW_2025.csv")
 
 
     # calculate deck preferences
     ahn_deck_preferences = calculate_deck_preferences(ahn_data)
-    en_gpt_deck_preferences = calculate_deck_preferences(eng_gpt_data)
-    jp_gpt_deck_preferences = calculate_deck_preferences(jp_gpt_data)
+    gpt_deck_preferences_old = calculate_deck_preferences(gpt_data_old)
+    gpt_deck_preferences_new = calculate_deck_preferences(gpt_data_new)
 
     # set font
     set_font()
 
     # plot deck preferences
-    plot_deck_preferences(ahn_deck_preferences, en_gpt_deck_preferences, jp_gpt_deck_preferences, labels=['Humans', 'ChatGPT 4.1 (EN)', 'ChatGPT 4.1 (JP)'], save_path=path.parents[2] / "src" / "1_descriptives" / "plots" / "deck_preferences.png")
+    plot_deck_preferences(ahn_deck_preferences, gpt_deck_preferences_old, gpt_deck_preferences_new, labels=['Humans', 'ChatGPT 2023', 'ChatGPT 4.1 (2025)'], save_path=path.parents[2] / "src" / "1_descriptives" / "plots" / "deck_preferences.png")
 
 
 

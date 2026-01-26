@@ -1,5 +1,6 @@
 # Simple Models Estimation Script (WSLS & Softmax)
 # Adapted for Win-Stay-Lose-Switch and Softmax models
+# testing this as an option
 
 #install.packages("pacman")
 pacman::p_load(R2jags, parallel)

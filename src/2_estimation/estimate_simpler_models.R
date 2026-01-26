@@ -1,6 +1,6 @@
 # Simple Models Estimation Script (WSLS & Softmax)
 # Adapted for Win-Stay-Lose-Switch and Softmax models
-# testing this as an option
+# testing this as an option (especially for the new data which does not like the ORL)
 
 #install.packages("pacman")
 pacman::p_load(R2jags, parallel)
@@ -9,17 +9,17 @@ pacman::p_load(R2jags, parallel)
 set.seed(1234)
 
 # set data groups
-groups <- c("ahn_hc", "gpt_EN", "gpt_JP")
+groups <- c("ahn_hc", "gpt_OLD_2023", "gpt_NEW_2025")
 
 ### SECTION WHERE YOU CAN CHANGE THINGS ###
-WSLS <- FALSE # if TRUE runs WSLS, if FALSE runs Softmax
+WSLS <- TRUE # if TRUE runs WSLS, if FALSE runs Softmax
 model_tag <- ifelse(WSLS, "WSLS", "Softmax")
 
 # new root path (name the code folder this)
 root_path <- "~/IGT_LLM_DecisionMaking"
 
 # select group and read in data 
-group_name <- groups[1] # grp1: human, grp2: gpt_en, grp3: gpt_jp
+group_name = groups[2] # grp1: human, grp2: gpt_old, grp3: gpt_new
 
 ### CODE ###
 # create and load file based on group selection
@@ -75,12 +75,9 @@ start_time <- Sys.time()
 # run jags model
 print("Initializing JAGS ...")
 print(paste("Running model:", model_tag, "| Group:", group_name))
-
-#might be overkill for a simple model
-samples <- jags.parallel(jags_data, inits = NULL, params,
+samples <- jags.parallel(jags_data, inits=NULL, params,
                          model.file = model_file,
-                         n.chains = 3, n.iter = 10000, n.burnin = 2000, 
-                         n.thin = 2, n.cluster = 4, jags.seed = 1234)
+                         n.chains=3, n.iter=3000, n.burnin=1000, n.thin=1, n.cluster=4, jags.seed= 1234)
 
 end_time <- Sys.time()
 print(paste("Runtime:", end_time - start_time))
@@ -89,7 +86,7 @@ print(paste("Runtime:", end_time - start_time))
 print(samples$BUGSoutput$summary)
 
 # save summary to txt file
-summary_file <- file.path(root_path, "src", "2_estimation", "results",
+summary_file <- file.path(root_path, "src", "2_estimation", "results", "simpler_models",
                           paste0("summary_", model_tag, "_", group_name, ".txt"))
 
 write.table(samples$BUGSoutput$summary, summary_file)
@@ -109,7 +106,7 @@ if (WSLS) {
 }
 
 # plot traceplots
-plotfile <- file.path(root_path, "src", "2_estimation", "plots", "traceplots", "simpler_models",
+plotfile <- file.path(root_path, "src", "2_estimation", "plots", "simpler_models",
                       paste0("trace_", model_tag, "_", group_name, ".png"))
 png(plotfile, width = 2500, height = 2500, res = 400)
 traceplot(samples$BUGSoutput, ask = FALSE, mfrow = c(2, 2), varname = params)

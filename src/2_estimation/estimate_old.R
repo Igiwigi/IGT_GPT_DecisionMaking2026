@@ -22,7 +22,7 @@ model_tag <- ifelse(fixed_theta, "fixedTheta", "freeTheta")
 root_path <- "~/IGT_LLM_DecisionMaking"
 
 # select group and read in data 
-group_name = groups[2] # grp1: human, grp2: gpt_old, grp3: gpt_new
+group_name = groups[3] # grp1: human (30), grp2: gpt_old (30), grp3: gpt_new (32)
 
 ### CODE ###
 # create and load file based on group selection
@@ -96,7 +96,7 @@ dic_file <- file.path(root_path, "src", "2_estimation", "results", "old_model",
 write.table(samples$BUGSoutput$DIC, dic_file)
 
 #plot deviance separately
-deviance_plotfile <- file.path(root_path, "src", "2_estimation", "plots", "traceplots", "old_Model",
+deviance_plotfile <- file.path(root_path, "src", "2_estimation", "plots", "old_Model",
                                paste0("trace_deviance_", model_tag, "_", group_name, ".png"))
 png(deviance_plotfile, width = 2500, height = 1200, res = 400)
 traceplot(samples$BUGSoutput, ask=FALSE, mfrow = c(1, 1), varname="deviance")
@@ -113,7 +113,7 @@ mu_omega_f <- Y$mu_omega_f
 mu_omega_p <- Y$mu_omega_p
 
 # plot traceplots
-plotfile <- file.path(root_path, "src", "2_estimation", "plots", "traceplots", "old_model", paste0("trace_", group_name, ".png"))
+plotfile <- file.path(root_path, "src", "2_estimation", "plots", "old_model", paste0("trace_", group_name, ".png"))
 png(plotfile, width = 2500, height = 2500, res = 400)
 traceplot(samples$BUGSoutput, ask=FALSE, mfrow = c(3, 2), varname=params)
 dev.off()

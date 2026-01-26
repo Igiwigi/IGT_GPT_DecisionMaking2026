@@ -4,6 +4,7 @@
 # Hierarchical ORL model estimation script
 # using new version of the code and models! (redundant to have 2 codes but most convenient rn)
 
+#NEW DATA IS NON-IDENTIFIABLE --> TOO GOOD PERFORMANCE ON THE IGT (multiple valid explanations)
 
 #install.packages("pacman")
 pacman::p_load(R2jags, parallel)
@@ -22,7 +23,7 @@ model_tag <- ifelse(fixed_theta, "fixedTheta", "freeTheta")
 root_path <- "~/IGT_LLM_DecisionMaking"
 
 # select group and read in data 
-group_name = groups[1] # grp1: human, grp2: gpt_old, grp3: gpt_new
+group_name = groups[3] # grp1: human, grp2: gpt_old, grp3: gpt_new
 
 ### CODE ###
 # create and load file based on group selection
@@ -165,7 +166,7 @@ if (fixed_theta) {
 }
 
 # plot traceplots
-plotfile <- file.path(root_path, "src", "2_estimation", "plots", "traceplots", "new_model",
+plotfile <- file.path(root_path, "src", "2_estimation", "plots", "new_model",
                       paste0("trace_", model_tag, "_", group_name, ".png"))
 
 # Calculate appropriate grid dimensions based on number of parameters (since it varies)
@@ -178,7 +179,7 @@ traceplot(samples$BUGSoutput, ask=FALSE, mfrow = c(n_rows, n_cols), varname=para
 dev.off()
 
 #plot deviance separately
-deviance_plotfile <- file.path(root_path, "src", "2_estimation", "plots", "traceplots", "new_model",
+deviance_plotfile <- file.path(root_path, "src", "2_estimation", "plots", "new_model",
                                paste0("trace_deviance_", model_tag, "_", group_name, ".png"))
 png(deviance_plotfile, width = 2500, height = 1200, res = 400)
 traceplot(samples$BUGSoutput, ask=FALSE, mfrow = c(1, 1), varname="deviance")

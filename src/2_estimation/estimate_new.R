@@ -196,8 +196,7 @@ if (fixed_theta) {
 
 # save df
 savefile <- file.path(root_path, "src", "2_estimation", "results", "new_model",
-                      paste0("grouplevel_", model_tag, "_", group_name, ".csv"))
-
+                      paste0("param_estimated_fixedTheta_", model_tag, "_", group_name, ".csv")) #clumsy but rn all are fixedTheta
 write.csv(df, savefile, row.names = FALSE)
 
 # print time run

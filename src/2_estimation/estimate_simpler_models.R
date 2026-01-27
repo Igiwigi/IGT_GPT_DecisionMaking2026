@@ -19,7 +19,7 @@ model_tag <- ifelse(WSLS, "WSLS", "Softmax")
 root_path <- "~/IGT_LLM_DecisionMaking"
 
 # select group and read in data 
-group_name = groups[2] # grp1: human, grp2: gpt_old, grp3: gpt_new
+group_name = groups[3] # grp1: human, grp2: gpt_old, grp3: gpt_new
 
 ### CODE ###
 # create and load file based on group selection

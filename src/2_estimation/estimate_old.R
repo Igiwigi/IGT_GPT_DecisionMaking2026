@@ -83,10 +83,10 @@ samples <- jags.parallel(jags_data, inits=NULL, params,
 print(samples$BUGSoutput$summary)
 print(samples$BUGSoutput$DIC)
 
-# save summary to txt file depending on group
+# save summary to txt file depending on group (clumsily saving all as fixedTheta rn since none are non-fixed)
 ifelse(grepl("^ahn_hc_", group_name),
-       summary_file <- file.path(root_path, "src", "2_estimation", "results", "extra_samples", paste0("summary_param_estimated_", group_name, ".txt")),
-       summary_file <- file.path(root_path, "src", "2_estimation", "results", "old_model", paste0("summary_param_estimated_", group_name, ".txt")))
+       summary_file <- file.path(root_path, "src", "2_estimation", "results", "extra_samples", paste0("summary_param_estimated_fixedTheta_", group_name, ".txt")),
+       summary_file <- file.path(root_path, "src", "2_estimation", "results", "old_model", paste0("summary_param_estimated_fixedTheta_", group_name, ".txt")))
 
 write.table(samples$BUGSoutput$summary, summary_file)
 
@@ -127,8 +127,8 @@ if (fixed_theta) {
 
 # save df (if it is an extra sample e.g., ahn_hc_3, then save to the "extra_samples" folder within results)
 ifelse(grepl("^ahn_hc_", group_name),
-       savefile <- file.path(root_path, "src", "2_estimation", "results", "extra_samples", paste0("param_estimated_", group_name, ".csv")),
-       savefile <- file.path(root_path,"src", "2_estimation", "results", "old_model", paste0("param_estimated_", group_name, ".csv")))
+       savefile <- file.path(root_path, "src", "2_estimation", "results", "extra_samples", paste0("param_estimated_fixedTheta_", group_name, ".csv")),
+       savefile <- file.path(root_path,"src", "2_estimation", "results", "old_model", paste0("param_estimated_fixedTheta_", group_name, ".csv")))
 
 write.csv(df, savefile)
 

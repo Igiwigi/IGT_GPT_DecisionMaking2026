@@ -26,7 +26,7 @@ def sample_truncated_normal(mean, sd, lower, upper, size=1000):
     return truncnorm.rvs(a, b, loc=mean, scale=sd, size=size)
 
 
-def plot_posteriors(hc_data, gpt_data, colors=["#398A20", "#20398A"], 
+def plot_posteriors(hc_data, gpt_data, colors=["#398A20", "#20398A", "#812E28"], 
                     parameters=[("mu_a_rew", "$\mu A_{rew}$"), ("mu_a_pun", "$\mu A_{pun}$"), 
                     ("mu_K", "$\mu K$"), ("mu_omega_f","$\mu \omega_F$"), ("mu_omega_p", "$\mu \omega_P$")], 
                     save_path=None, show_priors=False):
@@ -60,7 +60,7 @@ def plot_posteriors(hc_data, gpt_data, colors=["#398A20", "#20398A"],
         ax.set_ylabel("Density")
 
     # Create a single legend at the top of the figure
-    labels = ["Humans", "ChatGPT"]
+    labels = ["Humans", "ChatGPT 2023", "ChatGPT 4.1 2025"]
     if show_priors:
         labels.append("Prior")
     fig.legend(labels, loc='upper center', ncol=len(labels), bbox_to_anchor=(0.5, 0.98), fancybox=True)
@@ -201,7 +201,7 @@ def plot_multiple_descriptive_adequacies(hc_data, gpt_data, colors = ["#52993C",
 def main(): 
     # define paths
     path = pathlib.Path(__file__)
-    data_path = path.parents[2] / "src" / "2_estimation" / "results"
+    data_path = path.parents[2] / "src" / "2_estimation" / "results" / "new_model"
     
     # load parameter estimation data
     hc_data_params = pd.read_csv(data_path / "param_estimated_ahn_hc.csv")

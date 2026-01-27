@@ -78,6 +78,39 @@ param_list <- lapply(groups, function(g){
 names(param_list) <- groups
 
 # -------------------------------
+# Check posterior correlations / identifiability (and save them)
+# -------------------------------
+cor_dir <- file.path(ppc_dir, "parameter_correlations")
+if(!dir.exists(cor_dir)) dir.create(cor_dir, recursive = TRUE)
+
+if(!require(bayesplot)) install.packages("bayesplot")
+library(bayesplot)
+
+for(g in groups){
+  cat("Posterior pairs plot for group:", g, "\n")
+  
+  # Take first 1000 draws (or all if small) for clarity
+  posterior_sample <- param_list[[g]][1:min(1000, nrow(param_list[[g]])), ]
+  
+  # Select only parameters of interest
+  param_cols <- c("mu_a_rew", "mu_a_pun", "mu_K", "mu_omega_f", "mu_omega_p",
+                  "sigma_a_rew", "sigma_a_pun", "sigma_K", "sigma_omega_f", "sigma_omega_p")
+  
+  posterior_mat <- as.matrix(posterior_sample[, param_cols])
+  
+  # Generate the pairs plot
+  pairs_plot <- bayesplot::mcmc_pairs(posterior_mat,
+                                      diag_fun = "hist",
+                                      off_diag_fun = "scatter",
+                                      off_diag_args = list(alpha = 0.3, size=0.5))
+  
+  # Save using ggsave
+  ggsave(filename = file.path(cor_dir, paste0("posterior_pairs_", g, ".png")),
+         plot = pairs_plot,
+         width = 12, height = 10, dpi = 300)
+}
+
+# -------------------------------
 # Sample subject-level parameters (ORL model, non-centered)
 # -------------------------------
 sample_subject_params <- function(group_params, nsub){
@@ -307,3 +340,68 @@ ws_ls_plot <- ggplot(sim_summaries_long, aes(x=value, fill=group)) +
   theme_minimal()
 
 ggsave(file.path(ppc_dir, "ws_ls_ppc.png"), ws_ls_plot, width=10, height=6, dpi=300)
+
+
+# -------------------------------
+# Compute deck choice proportions (real vs simulated)
+# -------------------------------
+
+compute_deck_ratios <- function(df){
+  df %>%
+    group_by(subject, simulation) %>%
+    summarise(
+      A = mean(deck == 1, na.rm=TRUE),
+      B = mean(deck == 2, na.rm=TRUE),
+      C = mean(deck == 3, na.rm=TRUE),
+      D = mean(deck == 4, na.rm=TRUE),
+      .groups='drop'
+    ) %>%
+    pivot_longer(cols=A:D, names_to="deck", values_to="proportion")
+}
+
+# Simulated deck proportions
+sim_deck_ratios <- lapply(simulated_data, compute_deck_ratios)
+sim_deck_ratios_all <- bind_rows(lapply(names(sim_deck_ratios), function(g){
+  df <- sim_deck_ratios[[g]]
+  df$group <- g
+  df
+}))
+
+# Real deck proportions
+real_deck_ratios <- lapply(real_data_list, function(df){
+  df %>%
+    group_by(subject) %>%
+    summarise(
+      A = mean(deck == 1, na.rm=TRUE),
+      B = mean(deck == 2, na.rm=TRUE),
+      C = mean(deck == 3, na.rm=TRUE),
+      D = mean(deck == 4, na.rm=TRUE),
+      .groups='drop'
+    ) %>%
+    pivot_longer(cols=A:D, names_to="deck", values_to="proportion")
+})
+real_deck_ratios_all <- bind_rows(lapply(names(real_deck_ratios), function(g){
+  df <- real_deck_ratios[[g]]
+  df$group <- g
+  df
+}))
+
+# -------------------------------
+# Plot deck choice proportions
+# -------------------------------
+deck_choice_plot <- ggplot() +
+  # Simulated
+  geom_violin(data=sim_deck_ratios_all, 
+              aes(x=deck, y=proportion, fill=group), alpha=0.4) +
+  # Real
+  geom_point(data=real_deck_ratios_all, 
+             aes(x=deck, y=proportion, color=group), 
+             position=position_jitter(width=0.15), size=2) +
+  scale_fill_manual(values=c("ahn_hc"="black","gpt_OLD_2023"="blue","gpt_NEW_2025"="red")) +
+  scale_color_manual(values=c("ahn_hc"="black","gpt_OLD_2023"="blue","gpt_NEW_2025"="red")) +
+  labs(title="Posterior predictive check: deck choice proportions",
+       x="Deck", y="Proportion of choices") +
+  theme_minimal()
+
+ggsave(file.path(ppc_dir, "deck_choice_ppc.png"), deck_choice_plot, width=10, height=6, dpi=300)
+

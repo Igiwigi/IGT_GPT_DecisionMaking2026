@@ -1,0 +1,2 @@
+The fact that NEW is multimodal might mean that it has multiple explanations for the same behavior?
+--> There are two regions in parameter space that are plausible given the data.

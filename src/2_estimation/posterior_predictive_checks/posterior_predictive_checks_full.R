@@ -14,7 +14,7 @@ model_tag <- "fixedTheta"
 
 # ---- Load data ----
 fitfile <- file.path(root_path, "src", "2_estimation", "results", "new_model",
-                     paste0("jags_fit_", model_tag, "_", group_name, ".RData"))
+                     paste0("jags_fit_", model_tag, "_", group_name, ".RData")) #using the jags fit!!!
 load(fitfile)
 
 data_file <- file.path(root_path, "data", "final_data", paste0("clean_", group_name, ".csv"))

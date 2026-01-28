@@ -204,14 +204,15 @@ def main():
     data_path = path.parents[2] / "src" / "2_estimation" / "results" / "new_model"
     
     # load parameter estimation data
-    hc_data_params = pd.read_csv(data_path / "param_estimated_ahn_hc.csv")
-    gpt_data_params = pd.read_csv(data_path / "param_estimated_gpt.csv")
+    hc_data_params = pd.read_csv(data_path / "grouplevel_fixedTheta_ahn_hc.csv")
+    gpt_data_params_old = pd.read_csv(data_path / "grouplevel_fixedTheta_gpt_OLD_2025.csv")
+    gpt_data_params_new = pd.read.csv(data_path / "grouplevel_fixedTheta_gpt_NEW_2025.csv")
 
     # set global font to times if available
     set_font()
 
     # plot posteriors
-    plot_posteriors(hc_data_params, gpt_data_params, save_path=path.parents[2] / "src" / "2_estimation" / "plots" / "posterior_compare_w_priors", show_priors=True)
+    plot_posteriors(hc_data_params, gpt_data_params_old, gpt_data_params_new, save_path=path.parents[2] / "src" / "2_estimation" / "plots" / "posterior_compare_w_priors", show_priors=True)
 
      # load all csv files in the extra_samples subfolder in results
     hc_samples = []

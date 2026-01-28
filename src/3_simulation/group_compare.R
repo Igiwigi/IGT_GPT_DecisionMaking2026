@@ -1,17 +1,21 @@
+# ============================================================================
+# SIMULATION, SEEING IF WE CAN RECOVER PARAMETERS FOR GROUP COMPARISONS
+# ============================================================================
+
 #install.packages("pacman")
 pacman::p_load(hesim, extraDistr, R2jags, parallel)
 
 # set seed
-set.seed(2502)
+set.seed(1234)
 
 fixed_theta = TRUE
 
 # read json
-root_path <- "~/Desktop/dm-code" # personal comp
-#root_path <- "dm-code" # UCloud
+root_path <- "~/IGT_LLM_DecisionMaking"
+
 # define filename based on whether theta is fixed or not
 filename <- paste0("simulated_group_data", if(fixed_theta) "_fixed_theta", ".json")
-file <- file.path(root_path, "ChatGPT-IGT", "src", "recovery", "simulated_data", filename)
+file <- file.path(root_path, "src", "recovery", "simulated_data", filename)
 data <- jsonlite::fromJSON(file)
 
 MPD <- function(x) {density(x)$x[which(density(x)$y==max(density(x)$y))]}

@@ -23,7 +23,7 @@ model_tag <- ifelse(fixed_theta, "fixedTheta", "freeTheta")
 root_path <- "~/IGT_LLM_DecisionMaking"
 
 # select group and read in data 
-group_name = groups[3] # grp1: human, grp2: gpt_old, grp3: gpt_new
+group_name = groups[1] # grp1: human, grp2: gpt_old, grp3: gpt_new
 
 ### CODE ###
 # create and load file based on group selection
@@ -67,7 +67,8 @@ jags_data <- list("x","X","ntrials","nsubs")
 if (fixed_theta) {
   params <- c("mu_a_rew", "mu_a_pun", "mu_K", "mu_omega_f", "mu_omega_p",
               "sigma_a_rew", "sigma_a_pun", "sigma_K", "sigma_omega_f", "sigma_omega_p",
-              "deviance") #sigma (subj lvl variability), mu (grp lvl variability) (just incase we want to report on both)
+              "deviance", "x_pred") #sigma (subj lvl variability), mu (grp lvl variability) (just incase we want to report on both)
+  #x_pred is for the posterior predictive check!!! it slows down the model, however
   model_file <- file.path(root_path, "models", "hier_ORL_fixed_theta_new_ver.txt")
   #testing hopefully a less error-prone version (some problems with vars and the way theyre bounded & initialized, less centered now)
 } else {
@@ -110,24 +111,23 @@ print(start_time, "this is when this started running!") #too lazy to fix the err
 print("Intializing JAGS ...")
 print(paste("Running model:", model_tag, "| Group:", group_name))
 
-#doing high iter. to make up for having only 30 data points
-#samples <- jags.parallel(jags_data, inits=inits, params,
-#                         model.file = model_file,
-#                         n.chains=3, n.iter=10000, n.burnin=1500, n.thin=2, n.cluster=4, jags.seed = 1234)
-
-#what was here originally
+#what was here originally (dont need high iter with this model to converge)
 samples <- jags.parallel(jags_data, inits=NULL, params,
                          model.file = model_file,
                         n.chains=3, n.iter=3000, n.burnin=1000, n.thin=1, n.cluster=4, jags.seed= 1234)
 
-#doesnt print with bad deviance (if doesnt converge)
-print(samples$BUGSoutput$summary)
+#so x_pred doesnt go into the summary
+summary_params <- rownames(samples$BUGSoutput$summary)
+summary_params <- summary_params[!grepl("^x_pred", summary_params)]
+
+# print filtered summary
+print(samples$BUGSoutput$summary[summary_params, ])
 print(samples$BUGSoutput$DIC)
 
 # save summary to txt file depending on group
 summary_file <- file.path(root_path, "src", "2_estimation", "results", "new_model",
                           paste0("summary_grouplevel_", model_tag, "_", group_name, ".txt"))
-write.table(samples$BUGSoutput$summary, summary_file)
+write.table(samples$BUGSoutput$summary[summary_params, ], summary_file)
 
 # save DIC to separate file
 dic_file <- file.path(root_path, "src", "2_estimation", "results", "new_model",
@@ -169,14 +169,18 @@ if (fixed_theta) {
 plotfile <- file.path(root_path, "src", "2_estimation", "plots", "new_model",
                       paste0("trace_", model_tag, "_", group_name, ".png"))
 
-# Calculate appropriate grid dimensions based on number of parameters (since it varies)
-n_params <- length(params) - 1 #exclude deviance
+# Exclude x_pred and deviance from traceplots
+trace_params <- params[!params %in% c("x_pred", "deviance")]
+
+# Calculate appropriate grid dimensions based on number of parameters
+n_params <- length(trace_params)
 n_cols <- 2
 n_rows <- ceiling(n_params / n_cols)
 
 png(plotfile, width = 2500, height = 800 * n_rows, res = 400)
-traceplot(samples$BUGSoutput, ask=FALSE, mfrow = c(n_rows, n_cols), varname=params[params != "deviance"])
+traceplot(samples$BUGSoutput, ask=FALSE, mfrow = c(n_rows, n_cols), varname = trace_params)
 dev.off()
+
 
 #plot deviance separately
 deviance_plotfile <- file.path(root_path, "src", "2_estimation", "plots", "new_model",
@@ -198,6 +202,11 @@ if (fixed_theta) {
 savefile <- file.path(root_path, "src", "2_estimation", "results", "new_model",
                       paste0("param_estimated_fixedTheta_", model_tag, "_", group_name, ".csv")) #clumsy but rn all are fixedTheta
 write.csv(df, savefile, row.names = FALSE)
+
+# save the entire fitted JAGS model object (for poterior predictive check later)
+fitfile <- file.path(root_path, "src", "2_estimation", "results", "new_model",
+                     paste0("jags_fit_", model_tag, "_", group_name, ".RData"))
+save(samples, file = fitfile)
 
 # print time run
 end_time = Sys.time()

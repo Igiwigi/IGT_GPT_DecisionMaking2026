@@ -35,27 +35,18 @@ model {
     log(K[s]) <- mu_K + sigma_K * z_K[s]
     omega_f[s] <- mu_omega_f + sigma_omega_f * z_of[s]
     omega_p[s] <- mu_omega_p + sigma_omega_p * z_op[s]
-    theta[s] <- 1   # fixed, as in your original model
+    theta[s] <- 1   # fixed
     
     ############################
     ## INITIAL VALUES
     ############################
-    Ev[s,1,1] <- 0
-    Ev[s,1,2] <- 0
-    Ev[s,1,3] <- 0
-    Ev[s,1,4] <- 0
-    Ef[s,1,1] <- 0
-    Ef[s,1,2] <- 0
-    Ef[s,1,3] <- 0
-    Ef[s,1,4] <- 0
-    PS[s,1,1] <- 1
-    PS[s,1,2] <- 1
-    PS[s,1,3] <- 1
-    PS[s,1,4] <- 1
-    p[s,1,1] <- .25
-    p[s,1,2] <- .25
-    p[s,1,3] <- .25
-    p[s,1,4] <- .25
+    for (d in 1:4) {
+      Ev[s,1,d] <- 0
+      Ef[s,1,d] <- 0
+      PS[s,1,d] <- 1
+      p[s,1,d] <- 0.25
+    }
+    x_pred[s,1] ~ dcat(p[s,1,])
     
     ############################
     ## TRIAL LOOP
@@ -69,33 +60,27 @@ model {
       
       for (d in 1:4) {
         # ---- Expected value update ----
-        # Compute prediction error
         delta_Ev[s,t,d] <- X[s,t-1] - Ev[s,t-1,d]
-        
-        # Update only if this deck was chosen
         Ev[s,t,d] <- ifelse(d == x[s,t-1],
-                            Ev[s,t-1,d] + alpha_Ev[s,t] * delta_Ev[s,t,d],
-                            Ev[s,t-1,d])
+                             Ev[s,t-1,d] + alpha_Ev[s,t] * delta_Ev[s,t,d],
+                             Ev[s,t-1,d])
         
         # ---- Expected frequency update ----
-        # Compute prediction errors for chosen and not-chosen
         delta_Ef_cho[s,t,d] <- signX[s,t] - Ef[s,t-1,d]
         delta_Ef_not[s,t,d] <- -(signX[s,t]/3) - Ef[s,t-1,d]
-        
-        # Update based on whether deck was chosen
         Ef[s,t,d] <- ifelse(d == x[s,t-1],
-                            Ef[s,t-1,d] + alpha_Ef_cho[s,t] * delta_Ef_cho[s,t,d],
-                            Ef[s,t-1,d] + alpha_Ef_not[s,t] * delta_Ef_not[s,t,d])
+                             Ef[s,t-1,d] + alpha_Ef_cho[s,t] * delta_Ef_cho[s,t,d],
+                             Ef[s,t-1,d] + alpha_Ef_not[s,t] * delta_Ef_not[s,t,d])
         
         # ---- Perseveration signal ----
         PS[s,t,d] <- ifelse(x[s,t-1] == d,
-                            1 / (1 + K[s]),
-                            PS[s,t-1,d] / (1 + K[s]))
+                             1 / (1 + K[s]),
+                             PS[s,t-1,d] / (1 + K[s]))
         
         # ---- Total value ----
         V[s,t,d] <- Ev[s,t,d] + Ef[s,t,d] * omega_f[s] + PS[s,t,d] * omega_p[s]
         exp_p[s,t,d] <- exp(theta[s] * V[s,t,d])
-      }
+      } # end d loop
       
       # ---- Choice probabilities ----
       for (d in 1:4) {
@@ -104,6 +89,10 @@ model {
       
       # ---- Observed choice ----
       x[s,t] ~ dcat(p[s,t,])
-    }
-  }
-}
+      
+      # ---- Posterior predictive choice ----
+      x_pred[s,t] ~ dcat(p[s,t,])
+      
+    } # end t loop
+  } # end s loop
+} # end model

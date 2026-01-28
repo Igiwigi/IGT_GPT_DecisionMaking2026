@@ -15,29 +15,45 @@ file <- file.path(root_path, "src/3_simulation/recovery/simulated_data", filenam
 # Load JSON simulated group data
 data <- jsonlite::fromJSON(file)
 
-MPD <- function(x) { density(x)$x[which.max(density(x)$y)] }
+# ---------------------------
+# HELPER FUNCTION
+# ---------------------------
+MPD <- function(x) {
+  # robust mode estimator
+  x <- as.numeric(x)
+  if(length(x) == 0 || all(is.na(x))) return(NA)
+  d <- density(x)
+  d$x[which.max(d$y)]
+}
 
+# ---------------------------
+# SETUP
+# ---------------------------
 n_groups <- length(data$x)
+#for testing
+#n_groups <- 1
+n_groups <- 30 #100 is overkill
 
 # set timer
-start_time = Sys.time()
+start_time <- Sys.time()
 print(start_time, "this is when this started running!") #too lazy to fix the error regarding the timezone
 
 # ---------------------------
 # INIT PARAM STORAGE (matching the new model)
 # ---------------------------
-params <- c("mu_a_rew", "mu_a_pun", "mu_K", "mu_omega_f", "mu_omega_p")
-lambda_params <- c("lambda_a_rew", "lambda_a_pun", "lambda_K", "lambda_omega_f", "lambda_omega_p")
+params <- c("mu_a_rew", "mu_a_pun", "mu_K", "mu_omega_f", "mu_omega_p") #grp lvl estimates (group mean)
 
 true_mu <- matrix(NA, nrow=n_groups, ncol=length(params))
 infer_mu <- matrix(NA, nrow=n_groups, ncol=length(params))
 
-true_lambda <- matrix(NA, nrow=n_groups, ncol=length(lambda_params))
-infer_lambda <- matrix(NA, nrow=n_groups, ncol=length(lambda_params))
+# SDs not in current JAGS output, set as NA placeholders
+true_sd  <- matrix(NA, nrow=n_groups, ncol=length(params))
+infer_sd <- matrix(NA, nrow=n_groups, ncol=length(params))
 
 # ---------------------------
 # LOOP OVER GROUPS
 # ---------------------------
+print(paste0("This is how many groups there are: ", n_groups))
 for (i in 1:n_groups) {
   cat("Processing group", i, "\n")
   
@@ -54,12 +70,6 @@ for (i in 1:n_groups) {
   mu_omega_f <- as.numeric(data$mu_omega_f[i])
   mu_omega_p  <- as.numeric(data$mu_omega_p[i])
   
-  sigma_a_rew <- as.numeric(data$sigma_a_rew[i])
-  sigma_a_pun <- as.numeric(data$sigma_a_pun[i])
-  sigma_K     <- as.numeric(data$sigma_K[i])
-  sigma_omega_f  <- as.numeric(data$sigma_omega_f[i])
-  sigma_omega_p <- as.numeric(data$sigma_omega_p[i])
-  
   #prepare jags
   jags_data <- list(
     x = x,
@@ -70,10 +80,10 @@ for (i in 1:n_groups) {
   
   #params to monitor
   if (fixed_theta) {
-    jags_params <- c(params, lambda_params)
+    jags_params <- params  # only mu_* exist in JAGS output
     model_file <- file.path(root_path, "models", "hier_ORL_fixed_theta.txt")
   } else {
-    jags_params <- c(params, "mu_theta", "lambda_theta", lambda_params)
+    jags_params <- c(params, "mu_theta", "sigma_theta") # sigma_* not currently in output
     model_file <- file.path(root_path, "models", "hier_ORL.txt")
   }
   
@@ -92,14 +102,16 @@ for (i in 1:n_groups) {
   )
   
   sims <- samples$BUGSoutput$sims.list
+  cat("Available parameters in JAGS output:\n")
+  print(names(sims))
   
   #true and inferred params
   true_mu[i, ] <- c(mu_a_rew, mu_a_pun, mu_K, mu_omega_f, mu_omega_p)
   infer_mu[i, ] <- sapply(params, function(p) MPD(sims[[p]]))
   
-  true_lambda[i, ] <- 1 / c(sigma_a_rew, sigma_a_pun, sigma_K, sigma_omega_f, sigma_omega_p)
-  infer_lambda[i, ] <- sapply(lambda_params, function(p) MPD(sims[[p]]))
-  
+  #store true SDs as NA placeholders (theyre not monitored in the model..?)
+  true_sd[i, ] <- NA
+  infer_sd[i, ] <- NA
 }
 
 # ---------------------------
@@ -116,19 +128,7 @@ df <- data.frame(
   infer_mu_a_pun = infer_mu[,2],
   infer_mu_K = infer_mu[,3],
   infer_mu_omega_f = infer_mu[,4],
-  infer_mu_omega_p = infer_mu[,5],
-  
-  true_lambda_a_rew = true_lambda[,1],
-  true_lambda_a_pun = true_lambda[,2],
-  true_lambda_K = true_lambda[,3],
-  true_lambda_omega_f = true_lambda[,4],
-  true_lambda_omega_p = true_lambda[,5],
-  
-  infer_lambda_a_rew = infer_lambda[,1],
-  infer_lambda_a_pun = infer_lambda[,2],
-  infer_lambda_K = infer_lambda[,3],
-  infer_lambda_omega_f = infer_lambda[,4],
-  infer_lambda_omega_p = infer_lambda[,5]
+  infer_mu_omega_p = infer_mu[,5]
 )
 
 savefile_name <- paste0("param_recovery_group_ALL_", if(fixed_theta) "fixed_theta", ".csv")
@@ -136,5 +136,23 @@ write.csv(df, file.path(root_path, "src/3_simulation/recovery/results", savefile
 cat("Parameter recovery results saved to", savefile_name, "\n")
 
 # print time run
-end_time = Sys.time()
+end_time <- Sys.time()
 print(end_time - start_time)
+
+#print correlations between the values
+cor(df$true_mu_a_rew, df$infer_mu_a_rew)
+cor(df$true_mu_a_pun, df$infer_mu_a_pun)
+cor(df$true_mu_K, df$infer_mu_K)
+cor(df$true_mu_omega_f, df$infer_mu_omega_f)
+cor(df$true_mu_omega_p, df$infer_mu_omega_p)
+
+#plot the vals
+par(mfrow=c(2,3))
+for(p in c("a_rew", "a_pun", "K", "omega_f", "omega_p")) {
+  true_vals <- df[[paste0("true_mu_", p)]]
+  infer_vals <- df[[paste0("infer_mu_", p)]]
+  plot(true_vals, infer_vals, main=p, xlab="True", ylab="Inferred")
+  abline(a=0, b=1, col="red")
+}
+
+

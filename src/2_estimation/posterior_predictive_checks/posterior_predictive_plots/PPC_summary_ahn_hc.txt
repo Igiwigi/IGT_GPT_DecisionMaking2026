@@ -1,0 +1,27 @@
+
+===============================================
+POSTERIOR PREDICTIVE CHECK SUMMARY
+===============================================
+Group: ahn_hc 
+Model: Fixed theta = 1
+
+IF p value is <0.05 or >0.95, there is a significant mismatch between model and data!
+
+SWITCHES:
+  Observed total: 2068
+  Predicted mean: 2010.0 [1953.0, 2067.0]
+  Bayesian p-value: 0.023 *
+
+DECK PROPORTIONS:
+  Deck A: Obs=0.185, Pred=0.181 [0.166, 0.198], p=0.357
+  Deck B: Obs=0.266, Pred=0.273 [0.254, 0.292], p=0.755
+  Deck C: Obs=0.243, Pred=0.234 [0.218, 0.250], p=0.124
+  Deck D: Obs=0.306, Pred=0.312 [0.294, 0.330], p=0.761
+
+LEARNING:
+  Final block good decks: Obs=0.632, Pred=0.622 [0.580, 0.662], p=0.334
+
+
+WIN-STAY / LOSE-SWITCH:
+  Win-Stay:    Obs=0.328, Pred=0.325 [0.304, 0.346], p=0.374
+  Lose-Switch: Obs=0.808, Pred=0.685 [0.648, 0.722], p=0.000 *

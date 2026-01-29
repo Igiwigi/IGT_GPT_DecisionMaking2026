@@ -1,8 +1,6 @@
 # Simple Models Estimation Script (WSLS & Softmax)
 # Adapted for Win-Stay-Lose-Switch and Softmax models
-# testing this as an option (especially for the new data which does not like the ORL)
 
-#install.packages("pacman")
 pacman::p_load(R2jags, parallel)
 
 # set seed
@@ -19,9 +17,10 @@ model_tag <- ifelse(WSLS, "WSLS", "Softmax")
 root_path <- "~/IGT_LLM_DecisionMaking"
 
 # select group and read in data 
-group_name = groups[3] # grp1: human, grp2: gpt_old, grp3: gpt_new
+group_name = groups[2] # grp1: human, grp2: gpt_old, grp3: gpt_new
 
 ### CODE ###
+
 # create and load file based on group selection
 file <- file.path(root_path, "data", "final_data", paste0("clean_", group_name, ".csv"))
 data <- read.csv(file)
@@ -38,90 +37,144 @@ x <- array(0, c(nsubs, ntrials_max))
 X <- array(0, c(nsubs, ntrials_max))
 ntrials <- array(0, c(nsubs))
 
-# turn data from long format into arrays with (nsubs x ntrials_max) dimensions
+# turn data from long format into arrays
 print(paste0("Working on file: ", basename(file)))
 for (s in 1:nsubs) {
-  
-  # record n trials for subject s
   ntrials[s] <- length(x_raw[data$subjID == subIDs[s]])
-  
-  # extract x and X for subject s
-  X_sub <- X_raw[data$subjID == subIDs[s]] 
-  x_sub <- x_raw[data$subjID == subIDs[s]] 
-  
-  # assign arrays
-  x[s, ] <- x_sub
-  X[s, ] <- X_sub
+  X[s, ] <- X_raw[data$subjID == subIDs[s]] 
+  x[s, ] <- x_raw[data$subjID == subIDs[s]] 
 }
 
 # scale the payoffs
 X <- X / 100
 
-# set up jags and run jags model
+# set up jags data
 jags_data <- list("x", "X", "ntrials", "nsubs") 
 
-# Set parameters and model file based on model type
+# parameters and model file
 if (WSLS) {
-  params <- c("mu_prob_stay_win", "mu_prob_stay_lose", "mu_epsilon", "deviance") 
+  params <- c(
+    "mu_prob_stay_win", "mu_prob_stay_lose", "mu_epsilon", 
+    "lambda_prob_stay_win", "lambda_prob_stay_lose", "lambda_epsilon",
+    "prob_stay_win", "prob_stay_lose", "epsilon",
+    "x_pred", "deviance"
+  )
   model_file <- file.path(root_path, "models", "simpler_models", "WSLS_hier.txt")
 } else {
-  params <- c("mu_alpha", "mu_theta", "deviance")
+  params <- c(
+    "mu_alpha", "mu_theta", 
+    "lambda_alpha", "lambda_theta",
+    "alpha", "theta",
+    "x_pred", "deviance"
+  )
   model_file <- file.path(root_path, "models", "simpler_models", "Softmax_hier.txt")
 }
 
-# set timer
+# timer
 start_time <- Sys.time()
 
-# run jags model
+# run jags
 print("Initializing JAGS ...")
 print(paste("Running model:", model_tag, "| Group:", group_name))
-samples <- jags.parallel(jags_data, inits=NULL, params,
-                         model.file = model_file,
-                         n.chains=3, n.iter=3000, n.burnin=1000, n.thin=1, n.cluster=4, jags.seed= 1234)
+
+samples <- jags.parallel(
+  jags_data,
+  inits = NULL,
+  params,
+  model.file = model_file,
+  n.chains = 3,
+  n.iter = 5000,
+  n.burnin = 1000,
+  n.thin = 1,
+  n.cluster = 4,
+  jags.seed = 1234
+)
 
 end_time <- Sys.time()
 print(paste("Runtime:", end_time - start_time))
 
-# print summary
-print(samples$BUGSoutput$summary)
+#make the summary cleaner (dont spam with param[i])
+summary_full <- samples$BUGSoutput$summary
+keep_rows <- !grepl("\\[", rownames(summary_full))
+summary_clean <- summary_full[keep_rows, ]
 
-# save summary to txt file
-summary_file <- file.path(root_path, "src", "2_estimation", "results", "simpler_models",
-                          paste0("summary_", model_tag, "_", group_name, ".txt"))
+# print clean summary
+print(summary_clean)
 
-write.table(samples$BUGSoutput$summary, summary_file)
+# save clean summary
+summary_file <- file.path(
+  root_path, "src", "2_estimation", "results", "simpler_models",
+  paste0("summary_", model_tag, "_", group_name, ".txt")
+)
+write.table(summary_clean, summary_file)
 
-# extract mu parameters and create df based on model type
+# extract posterior samples
 Y <- samples$BUGSoutput$sims.list
 
 if (WSLS) {
-  mu_prob_stay_win <- Y$mu_prob_stay_win
-  mu_prob_stay_lose <- Y$mu_prob_stay_lose
-  mu_epsilon <- Y$mu_epsilon
-  df <- data.frame(mu_prob_stay_win, mu_prob_stay_lose, mu_epsilon)
+  df <- data.frame(
+    mu_prob_stay_win = Y$mu_prob_stay_win,
+    mu_prob_stay_lose = Y$mu_prob_stay_lose,
+    mu_epsilon = Y$mu_epsilon,
+    lambda_prob_stay_win = Y$lambda_prob_stay_win,
+    lambda_prob_stay_lose = Y$lambda_prob_stay_lose,
+    lambda_epsilon = Y$lambda_epsilon
+  )
 } else {
-  mu_alpha <- Y$mu_alpha
-  mu_theta <- Y$mu_theta
-  df <- data.frame(mu_alpha, mu_theta)
+  df <- data.frame(
+    mu_alpha = Y$mu_alpha,
+    mu_theta = Y$mu_theta,
+    lambda_alpha = Y$lambda_alpha,
+    lambda_theta = Y$lambda_theta
+  )
 }
 
-# plot traceplots
-plotfile <- file.path(root_path, "src", "2_estimation", "plots", "simpler_models",
-                      paste0("trace_", model_tag, "_", group_name, ".png"))
+# traceplots (group-level only)
+plotfile <- file.path(
+  root_path, "src", "2_estimation", "plots", "simpler_models",
+  paste0("trace_", model_tag, "_", group_name, ".png")
+)
+
+if (WSLS) {
+  trace_params <- c(
+    "mu_prob_stay_win",
+    "mu_prob_stay_lose",
+    "mu_epsilon",
+    "deviance"
+  )
+} else {
+  trace_params <- c("mu_alpha", "mu_theta")
+}
+
 png(plotfile, width = 2500, height = 2500, res = 400)
-traceplot(samples$BUGSoutput, ask = FALSE, mfrow = c(2, 2), varname = params)
+traceplot(
+  samples$BUGSoutput,
+  ask = FALSE,
+  mfrow = c(2, 2),
+  varname = trace_params
+)
 dev.off()
 
-# save df
-savefile <- file.path(root_path, "src", "2_estimation", "results", "simpler_models",
-                      paste0("param_", model_tag, "_", group_name, ".csv"))
+# save parameter df
+savefile <- file.path(
+  root_path, "src", "2_estimation", "results", "simpler_models",
+  paste0("param_estimated_", model_tag, "_", group_name, ".csv")
+)
+write.csv(df, savefile, row.names = FALSE)
 
-write.csv(df, savefile)
-
-# save DIC to separate file
-dic_file <- file.path(root_path, "src", "2_estimation", "results", "simpler_models",
-                      paste0("DIC_grouplevel_", model_tag, "_", group_name, ".txt"))
+# save DIC
+dic_file <- file.path(
+  root_path, "src", "2_estimation", "results", "simpler_models",
+  paste0("DIC_grouplevel_", model_tag, "_", group_name, ".txt")
+)
 write.table(samples$BUGSoutput$DIC, dic_file)
 
-# print final runtime
+# save full fit
+fitfile <- file.path(
+  root_path, "src", "2_estimation", "results", "simpler_models",
+  paste0("jags_fit_", model_tag, "_", group_name, ".RData")
+)
+save(samples, file = fitfile)
+
+print(paste("JAGS fit saved to:", fitfile))
 print(paste("Total runtime:", end_time - start_time))

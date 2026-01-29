@@ -37,6 +37,15 @@ model {
     p[s, 1, 3] <- 0.25
     p[s, 1, 4] <- 0.25
     
+    # Initialize first trial for predictions
+    p_pred[s, 1, 1] <- 0.25
+    p_pred[s, 1, 2] <- 0.25
+    p_pred[s, 1, 3] <- 0.25
+    p_pred[s, 1, 4] <- 0.25
+    
+    # Sample first predicted choice
+    x_pred[s, 1] ~ dcat(p_pred[s, 1, ])
+    
     # Loop through trials starting from trial 2
     for (t in 2:ntrials[s]) {
       
@@ -58,10 +67,20 @@ model {
         
         # Mix with random exploration
         p[s, t, d] <- (1 - epsilon[s]) * if_stayed[s, t, d] + epsilon[s] * 0.25
+        
+        # Same for predicted choices (based on x_pred instead of x)
+        if_stayed_pred[s, t, d] <- ifelse(d == x_pred[s, t-1], 
+                                           stay_prob[s, t], 
+                                           (1 - stay_prob[s, t]) / 3)
+        
+        p_pred[s, t, d] <- (1 - epsilon[s]) * if_stayed_pred[s, t, d] + epsilon[s] * 0.25
       }
       
       # Sample choice from categorical distribution
       x[s, t] ~ dcat(p[s, t, ])
+      
+      # Sample predicted choice
+      x_pred[s, t] ~ dcat(p_pred[s, t, ])
     }
   }
 }

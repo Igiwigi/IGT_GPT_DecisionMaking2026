@@ -31,7 +31,7 @@ MPD <- function(x) {
 # ---------------------------
 n_groups <- length(data$x) #100
 #for testing
-n_groups <- 1 #100 is overkill, maybe do 30 in the end (only a few for testing though)
+n_groups <- 30 #100 is overkill, maybe do 30 in the end (only a few for testing though)
 
 # set timer
 start_time <- Sys.time()

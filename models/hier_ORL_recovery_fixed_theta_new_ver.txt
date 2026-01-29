@@ -1,0 +1,99 @@
+model {
+  ############################
+  ## GROUP-LEVEL PRIORS
+  ############################
+  # ---- Learning rates (logit-normal, non-centered) ----
+  mu_a_rew ~ dnorm(-1.5, 1)      # logit scale (≈ 0.18)
+  mu_a_pun ~ dnorm(-2.5, 1)      # logit scale (≈ 0.08)
+  sigma_a_rew ~ dgamma(1, 1)     # Changed from dunif to dgamma for better monitoring
+  sigma_a_pun ~ dgamma(1, 1)
+  
+  # ---- Inverse temperature K (log-normal, non-centered) ----
+  mu_K ~ dnorm(0, 1)
+  sigma_K ~ dgamma(1, 1)         # Changed from dunif to dgamma
+  
+  # ---- Observational weights ----
+  mu_omega_f ~ dnorm(0, 0.1)
+  mu_omega_p ~ dnorm(0, 0.1)
+  sigma_omega_f ~ dgamma(2, 1)   # Changed from dunif to dgamma
+  sigma_omega_p ~ dgamma(2, 1)
+  
+  ############################
+  ## SUBJECT-LEVEL PARAMETERS
+  ############################
+  for (s in 1:nsubs) {
+    # ---- Non-centered parameterization ----
+    z_a_rew[s] ~ dnorm(0,1)
+    z_a_pun[s] ~ dnorm(0,1)
+    z_K[s]     ~ dnorm(0,1)
+    z_of[s]    ~ dnorm(0,1)
+    z_op[s]    ~ dnorm(0,1)
+    
+    # ---- Transforms ----
+    logit(a_rew[s]) <- mu_a_rew + sigma_a_rew * z_a_rew[s]
+    logit(a_pun[s]) <- mu_a_pun + sigma_a_pun * z_a_pun[s]
+    log(K[s]) <- mu_K + sigma_K * z_K[s]
+    omega_f[s] <- mu_omega_f + sigma_omega_f * z_of[s]
+    omega_p[s] <- mu_omega_p + sigma_omega_p * z_op[s]
+    theta[s] <- 1   # fixed
+    
+    ############################
+    ## INITIAL VALUES
+    ############################
+    for (d in 1:4) {
+      Ev[s,1,d] <- 0
+      Ef[s,1,d] <- 0
+      PS[s,1,d] <- 1
+      p[s,1,d] <- 0.25
+    }
+    x_pred[s,1] ~ dcat(p[s,1,])
+    
+    ############################
+    ## TRIAL LOOP
+    ############################
+    for (t in 2:ntrials[s]) {
+      # Determine sign of outcome and which learning rates to use
+      signX[s,t] <- ifelse(X[s,t-1] < 0, -1, 1)
+      alpha_Ev[s,t] <- ifelse(X[s,t-1] >= 0, a_rew[s], a_pun[s])
+      alpha_Ef_cho[s,t] <- ifelse(X[s,t-1] >= 0, a_rew[s], a_pun[s])
+      alpha_Ef_not[s,t] <- ifelse(X[s,t-1] >= 0, a_pun[s], a_rew[s])
+      
+      for (d in 1:4) {
+        # ---- Expected value update ----
+        delta_Ev[s,t,d] <- X[s,t-1] - Ev[s,t-1,d]
+        Ev[s,t,d] <- ifelse(d == x[s,t-1],
+                             Ev[s,t-1,d] + alpha_Ev[s,t] * delta_Ev[s,t,d],
+                             Ev[s,t-1,d])
+        
+        # ---- Expected frequency update ----
+        delta_Ef_cho[s,t,d] <- signX[s,t] - Ef[s,t-1,d]
+        delta_Ef_not[s,t,d] <- -(signX[s,t]/3) - Ef[s,t-1,d]
+        Ef[s,t,d] <- ifelse(d == x[s,t-1],
+                             Ef[s,t-1,d] + alpha_Ef_cho[s,t] * delta_Ef_cho[s,t,d],
+                             Ef[s,t-1,d] + alpha_Ef_not[s,t] * delta_Ef_not[s,t,d])
+        
+        # ---- Perseveration signal ----
+        PS[s,t,d] <- ifelse(x[s,t-1] == d,
+                             1 / (1 + K[s]),
+                             PS[s,t-1,d] / (1 + K[s]))
+        
+        # ---- Total value ----
+        V[s,t,d] <- Ev[s,t,d] + Ef[s,t,d] * omega_f[s] + PS[s,t,d] * omega_p[s]
+        exp_p[s,t,d] <- exp(theta[s] * V[s,t,d])
+      } # end d loop
+      
+      # ---- Choice probabilities ----
+      for (d in 1:4) {
+        p[s,t,d] <- exp_p[s,t,d] / sum(exp_p[s,t,])
+      }
+      
+      # ---- Observed choice ----
+      x[s,t] ~ dcat(p[s,t,])
+      
+      # ---- Posterior predictive choice ----
+      x_pred[s,t] ~ dcat(p[s,t,])
+      
+    } # end t loop
+  } # end s loop
+  
+} # end model

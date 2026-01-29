@@ -3,8 +3,8 @@ model {
   ## GROUP-LEVEL PRIORS
   ############################
   # ---- Learning rates (logit-normal, non-centered) ----
-  mu_a_rew ~ dnorm(-1.5, 1)      # logit scale (≈ 0.18)
-  mu_a_pun ~ dnorm(-2.5, 1)      # logit scale (≈ 0.08)
+  mu_a_rew ~ dnorm(-1.5, 1)
+  mu_a_pun ~ dnorm(-2.5, 1)
   sigma_a_rew ~ dunif(0, 1)
   sigma_a_pun ~ dunif(0, 1)
   
@@ -80,7 +80,7 @@ model {
         # ---- Total value ----
         V[s,t,d] <- Ev[s,t,d] + Ef[s,t,d] * omega_f[s] + PS[s,t,d] * omega_p[s]
         exp_p[s,t,d] <- exp(theta[s] * V[s,t,d])
-      } # end d loop
+      } 
       
       # ---- Choice probabilities ----
       for (d in 1:4) {
@@ -93,6 +93,6 @@ model {
       # ---- Posterior predictive choice ----
       x_pred[s,t] ~ dcat(p[s,t,])
       
-    } # end t loop
-  } # end s loop
-} # end model
+    } 
+  } 
+}

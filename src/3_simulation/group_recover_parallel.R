@@ -1,5 +1,6 @@
 # ============================================================================
 # GROUP PARAMETER RECOVERY - HIERARCHICAL ORL, seeing if we can recover params from the (new) model itself!!
+#doesnt seem like this works?
 # ============================================================================
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite, foreach, doSNOW)

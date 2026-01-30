@@ -1,6 +1,9 @@
 # ============================================================================
 # GROUP & INDIV PARAMETER RECOVERY - HIERARCHICAL WSLS (win-stay / lose-stay + epsilon)
 # ============================================================================
+#need to report corr (true vs recovered), bias, slope (they're included, but only at the end right now)
+#bit of a messy monster
+
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite)
 
@@ -17,7 +20,7 @@ data <- jsonlite::fromJSON(file)
 # ---------------------------
 # HELPER FUNCTION
 # ---------------------------
-MPD <- function(x) {
+MPD <- function(x) { #this takes the mode
   x <- as.numeric(x)
   if(length(x) == 0 || all(is.na(x))) return(NA)
   d <- density(x)
@@ -139,11 +142,26 @@ for (i in 1:n_groups) {
     parameters.to.save = jags_params,
     model.file = model_file,
     n.chains = 3,
-    n.iter = 3000,
+    n.iter = 5000,
     n.burnin = 1000,
     n.thin = 1,
-    n.cluster = 4
+    n.cluster = 4,
+    jags.seed= 1234
   )
+  
+  # ---------------------------
+  # CONVERGENCE DIAGNOSTICS (DETAILED)
+  # ---------------------------
+  summary_mat <- samples$BUGSoutput$summary
+  conv_params <- c(params, lambda_params, indiv_params)
+  conv_params <- conv_params[conv_params %in% rownames(summary_mat)]
+  rhat_vec <- summary_mat[conv_params, "Rhat"]
+  ess_vec  <- summary_mat[conv_params, "n.eff"]
+  max_rhat[i] <- max(rhat_vec, na.rm = TRUE)
+  min_ess[i]  <- min(ess_vec,  na.rm = TRUE)
+  
+  cat("\nConvergence diagnostics:\n")
+  print(summary_mat[conv_params, c("Rhat", "n.eff")], digits = 3)
   
   group_end <- Sys.time()
   cat(sprintf("Group %d completed in %.2f minutes\n", i, as.numeric(difftime(group_end, group_start, units="mins"))))
@@ -163,16 +181,6 @@ for (i in 1:n_groups) {
     p <- indiv_params[p_idx]
     infer_indiv[i, 1:nsubs, p_idx] <- apply(sims[[p]], 2, MPD)
   }
-  
-  # convergence diagnostics
-  all_params <- c(params, lambda_params)
-  rhat_values <- samples$BUGSoutput$summary[all_params, "Rhat"]
-  ess_values <- samples$BUGSoutput$summary[all_params, "n.eff"]
-  
-  max_rhat[i] <- max(rhat_values, na.rm=TRUE)
-  min_ess[i] <- min(ess_values, na.rm=TRUE)
-  
-  cat(sprintf("Convergence: Max Rhat = %.3f, Min ESS = %.0f\n", max_rhat[i], min_ess[i]))
   
   if(max_rhat[i] > 1.1) {
     warning(sprintf("Group %d: Poor convergence (Rhat = %.3f)\n", i, max_rhat[i]))
@@ -206,7 +214,6 @@ for (i in 1:n_groups) {
   # ---------------------------
   # SAVE INCREMENTAL RESULTS - INDIVIDUAL LEVEL
   # ---------------------------
-  # Reshape individual data to long format
   df_indiv_list <- list()
   for(g in 1:n_groups) {
     if(!is.na(n_subjects[g]) && n_subjects[g] > 0) {
@@ -286,8 +293,8 @@ for (i in 1:n_groups) {
                xlab="True", ylab="Inferred", pch=20, cex=0.5)
           abline(a=0, b=1, col="red")
           r <- cor(true_vals, infer_vals, use="complete.obs")
-          legend("topleft", legend=sprintf("r=%.3f\nn=%d", r, nrow(df_indiv_complete)), 
-                 bty="n", cex=0.8)
+          mtext(sprintf("r=%.3f, n=%d", r, nrow(df_indiv_complete)), 
+                side=3, line=0.5, adj=0, cex=0.7)
         }
         dev.off()
       }
@@ -320,51 +327,120 @@ cat(sprintf("Individual-level results: %s\n", csv_indiv_file))
 completed <- !is.na(infer_mu[,1])
 df_complete <- df_group[completed,]
 
-cat("\n=== GROUP-LEVEL PARAMETERS ===\n")
-cat("\nMu parameter recovery:\n")
+# ---------------------------
+# GROUP-LEVEL RECOVERY METRICS (r, slope, bias, RMSE)
+# ---------------------------
 for(p in c("prob_stay_win_raw","prob_stay_lose_raw","epsilon_raw")) {
-  true_v <- df_complete[[paste0("true_mu_", p)]]
+  true_v  <- df_complete[[paste0("true_mu_", p)]]
   infer_v <- df_complete[[paste0("infer_mu_", p)]]
-  r <- cor(true_v, infer_v, use="complete.obs")
-  bias <- mean(infer_v - true_v, na.rm=TRUE)
-  rmse <- sqrt(mean((infer_v - true_v)^2, na.rm=TRUE))
-  cat(sprintf("  %s: r=%.3f, bias=%.3f, RMSE=%.3f\n", p, r, bias, rmse))
+  
+  df_group[[paste0("mu_", p, "_r")]]     <- NA
+  df_group[[paste0("mu_", p, "_bias")]]  <- NA
+  df_group[[paste0("mu_", p, "_rmse")]]  <- NA
+  df_group[[paste0("mu_", p, "_slope")]] <- NA
+  
+  idx <- which(completed)
+  df_group[idx, paste0("mu_", p, "_r")]     <- cor(true_v, infer_v, use="complete.obs")
+  df_group[idx, paste0("mu_", p, "_bias")]  <- mean(infer_v - true_v, na.rm=TRUE)
+  df_group[idx, paste0("mu_", p, "_rmse")]  <- sqrt(mean((infer_v - true_v)^2, na.rm=TRUE))
+  df_group[idx, paste0("mu_", p, "_slope")] <- coef(lm(infer_v ~ true_v))[2]
 }
 
-cat("\nLambda parameter recovery:\n")
 for(p in c("prob_stay_win","prob_stay_lose","epsilon")) {
-  true_v <- df_complete[[paste0("true_lambda_", p)]]
+  true_v  <- df_complete[[paste0("true_lambda_", p)]]
   infer_v <- df_complete[[paste0("infer_lambda_", p)]]
-  r <- cor(true_v, infer_v, use="complete.obs")
-  bias <- mean(infer_v - true_v, na.rm=TRUE)
-  rmse <- sqrt(mean((infer_v - true_v)^2, na.rm=TRUE))
-  cat(sprintf("  %s: r=%.3f, bias=%.3f, RMSE=%.3f\n", p, r, bias, rmse))
+  
+  df_group[[paste0("lambda_", p, "_r")]]     <- NA
+  df_group[[paste0("lambda_", p, "_bias")]]  <- NA
+  df_group[[paste0("lambda_", p, "_rmse")]]  <- NA
+  df_group[[paste0("lambda_", p, "_slope")]] <- NA
+  
+  idx <- which(completed)
+  df_group[idx, paste0("lambda_", p, "_r")]     <- cor(true_v, infer_v, use="complete.obs")
+  df_group[idx, paste0("lambda_", p, "_bias")]  <- mean(infer_v - true_v, na.rm=TRUE)
+  df_group[idx, paste0("lambda_", p, "_rmse")]  <- sqrt(mean((infer_v - true_v)^2, na.rm=TRUE))
+  df_group[idx, paste0("lambda_", p, "_slope")] <- coef(lm(infer_v ~ true_v))[2]
 }
 
-# Correlations - Individual level
+# overwrite group CSV with metrics
+write.csv(df_group, csv_file, row.names = FALSE)
+cat(sprintf("Updated group CSV with recovery metrics: %s\n", basename(csv_file)))
+
+# ---------------------------
+# INDIVIDUAL-LEVEL RECOVERY METRICS
+# ---------------------------
 if(exists("df_indiv") && nrow(df_indiv) > 0) {
   df_indiv_complete <- df_indiv[complete.cases(df_indiv[,3:8]), ]
   
-  cat("\n=== INDIVIDUAL-LEVEL PARAMETERS ===\n")
-  cat(sprintf("Total subjects across groups: %d\n", nrow(df_indiv_complete)))
-  
+  df_indiv_summary <- data.frame()
   for(p in c("prob_stay_win","prob_stay_lose","epsilon")) {
-    true_v <- df_indiv_complete[[paste0("true_", p)]]
+    true_v  <- df_indiv_complete[[paste0("true_", p)]]
     infer_v <- df_indiv_complete[[paste0("infer_", p)]]
-    r <- cor(true_v, infer_v, use="complete.obs")
-    bias <- mean(infer_v - true_v, na.rm=TRUE)
-    rmse <- sqrt(mean((infer_v - true_v)^2, na.rm=TRUE))
-    cat(sprintf("  %s: r=%.3f, bias=%.3f, RMSE=%.3f\n", p, r, bias, rmse))
+    
+    df_indiv_summary <- rbind(
+      df_indiv_summary,
+      data.frame(
+        parameter = p,
+        r     = cor(true_v, infer_v, use="complete.obs"),
+        slope = coef(lm(infer_v ~ true_v))[2],
+        bias  = mean(infer_v - true_v, na.rm=TRUE),
+        rmse  = sqrt(mean((infer_v - true_v)^2, na.rm=TRUE))
+      )
+    )
   }
+  
+  write.csv(
+    df_indiv_summary,
+    file.path(results_dir, "param_recovery_indiv_summary_WSLS.csv"),
+    row.names = FALSE
+  )
+  cat(sprintf("Saved individual-level summary metrics: %s\n", "param_recovery_indiv_summary_WSLS.csv"))
 }
 
-# Convergence diagnostics summary
+# ---------------------------
+# CONVERGENCE DIAGNOSTICS SUMMARY
+# ---------------------------
 cat("\n=== CONVERGENCE DIAGNOSTICS ===\n")
 cat(sprintf("Groups with Rhat > 1.1: %d/%d\n", 
-            sum(max_rhat > 1.1, na.rm=TRUE), sum(!is.na(max_rhat))))
+            sum(max_rhat > 1.1, na.rm = TRUE), sum(!is.na(max_rhat)))) #63 have bad rhat, but the plots and vars are good, so fine?
 cat(sprintf("Mean max Rhat: %.3f (SD=%.3f)\n", 
-            mean(max_rhat, na.rm=TRUE), sd(max_rhat, na.rm=TRUE)))
-cat(sprintf("Mean min ESS: %.0f (SD=%.0f)\n", 
-            mean(min_ess, na.rm=TRUE), sd(min_ess, na.rm=TRUE)))
+            mean(max_rhat, na.rm = TRUE), sd(max_rhat, na.rm = TRUE)))
+cat(sprintf("Mean min ESS: %.0f (SD=%.0f)\n",
+            mean(min_ess, na.rm = TRUE), sd(min_ess, na.rm = TRUE))) #low n for some of the vars
 
 cat("\nDone!\n")
+
+
+# ---------------------------
+# CONVERGENCE DIAGNOSTICS SUMMARY EXTRA (RHAT & PARAMETER EXTREMENESS)
+# ---------------------------
+df_diag <- df_group
+
+# Transform raw mus to probability scale
+df_diag$true_prob_stay_win <- pnorm(df_diag$true_mu_prob_stay_win_raw)
+df_diag$true_prob_stay_lose <- pnorm(df_diag$true_mu_prob_stay_lose_raw)
+df_diag$true_epsilon_prob  <- pnorm(df_diag$true_mu_epsilon_raw)
+
+# Flag problematic convergence
+df_diag$bad_rhat <- df_diag$max_rhat > 1.1
+
+# Summaries
+cat("\nMean transformed parameters by Rhat group:\n")
+print(aggregate(
+  cbind(true_prob_stay_win, true_prob_stay_lose, true_epsilon_prob) ~ bad_rhat,
+  data = df_diag,
+  FUN = mean,
+  na.rm = TRUE
+))
+
+cat("\nProportion of extreme values (p < .05 or > .95):\n")
+extreme_percent <- function(x) {
+  mean(x < 0.05 | x > 0.95, na.rm = TRUE) * 100
+}
+
+#amount of extreme variables, in percent (around 8-13%)
+print(aggregate(
+  cbind(true_prob_stay_win, true_prob_stay_lose, true_epsilon_prob) ~ bad_rhat,
+  data = df_diag,
+  FUN = extreme_percent
+))

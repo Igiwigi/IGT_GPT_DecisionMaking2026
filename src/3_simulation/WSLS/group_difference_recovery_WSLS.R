@@ -3,7 +3,7 @@
 # ============================================================================
 # To see whether we can recover the group differences between the 3 different groups!!
 # could also remove old GPT and only do differences between human and new!! (to make it less intensive)
-# quickly thrown together
+# quickly thrown together, hopefully works (still issues)
 
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite)
@@ -32,7 +32,7 @@ MPD <- function(x) {
 # ---------------------------
 # SIMULATION PARAMETERS
 # ---------------------------
-n_simulations <- 2 #how many to do (for testing, do less)
+n_simulations <- 1 #how many to do (for testing, do less)
 n_subjects_per_group <- 30
 n_trials <- 100 
 
@@ -409,7 +409,7 @@ for (g_name in c("human", "gpt2023", "gpt2025")) {
     true_col <- paste0("true_mu_", param)
     rec_col <- paste0("rec_mu_", param)
     
-    r <- cor(res_g[[true_col]], res_g[[rec_col]], use="complete.obs")
+    #r <- safe_cor(res_g[[true_col]], res_g[[rec_col]]) #the sd is zero (our params don't vary)
     bias <- mean(res_g[[rec_col]] - res_g[[true_col]], na.rm=TRUE)
     rmse <- sqrt(mean((res_g[[rec_col]] - res_g[[true_col]])^2, na.rm=TRUE))
     

@@ -160,6 +160,28 @@ for (i in 1:n_groups) {
   max_rhat[i] <- max(rhat_vec, na.rm = TRUE)
   min_ess[i]  <- min(ess_vec,  na.rm = TRUE)
   
+  #some prints for each run
+  cat("Rhat by parameter and group:\n")
+  group_labels <- c("human", "gpt2023", "gpt2025")
+  
+  for (p in jags_params) {
+    cat(sprintf("  %s:\n", p))
+    
+    for (g in 1:3) {
+      row_name <- paste0(p, "[", g, "]")
+      
+      if (row_name %in% rownames(summary_mat)) {
+        rhat_val <- summary_mat[row_name, "Rhat"]
+        ess_val  <- summary_mat[row_name, "n.eff"]
+        
+        cat(sprintf(
+          "    %-8s  Rhat = %.3f | ESS = %.0f\n",
+          group_labels[g], rhat_val, ess_val
+        ))
+      }
+    }
+  }
+  
   cat("\nConvergence diagnostics:\n")
   print(summary_mat[conv_params, c("Rhat", "n.eff")], digits = 3)
   

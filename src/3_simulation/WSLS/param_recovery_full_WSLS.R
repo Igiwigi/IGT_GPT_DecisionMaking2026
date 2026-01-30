@@ -74,7 +74,7 @@ plot_indiv_file <- file.path(results_dir, "recovery_indiv_WSLS_incremental.png")
 for (i in 1:n_groups) {
   cat(sprintf("\n=== Processing group %d/%d ===\n", i, n_groups))
   
-  # extract choices and outcomes
+  # extract choices and outcomes (from simulated data)
   x <- data$x[[i]] + 1
   X <- data$X[[i]]
   nsubs <- nrow(x)

@@ -4,7 +4,6 @@
 # ============================================================================
 # This script runs the parameter recovery simulation and saves all results (to see group difference recovery!!)
 # Run visualization script separately after this completes!!
-# simulating new data since old data doesn't encompass group differences (this is very stupid and should have been done in the python simulation file in the first place!!!!)
 
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite, data.table)
@@ -18,50 +17,62 @@ results_dir <- file.path(root_path, "src/3_simulation/WSLS/recovery/results/grou
 dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
 model_file <- file.path(root_path, "models", "simpler_models", "WSLS_hier_grp_compare.txt")
 
-payoff_file <- file.path(root_path, "utils", "payoff_scheme_3.csv")
-payoff_df <- fread(payoff_file)
+# Load simulated data from Python
+simulated_data_file <- file.path(root_path, "src/3_simulation/WSLS/recovery/simulated_data/simulated_group_comparison_winlose.json")
+simulated_data <- fromJSON(simulated_data_file)
 
 # ---------------------------
 # SIMULATION PARAMETERS
 # ---------------------------
-n_simulations <- 30
-n_subjects_per_group <- 30
-n_trials <- 100
+n_simulations <- length(simulated_data$iteration)
 group_names <- c("human", "gpt2023", "gpt2025")
 
-# Define TRUE group parameters based on empirical data
+# Extract TRUE parameters from the first iteration (they're the same for all iterations)
+true_params_raw <- simulated_data$true_params[[1]]
+
+# Convert to R list structure
 true_params <- list(
-  # Group 1: Humans
   human = list(
-    mu = c(prob_stay_win_raw = qnorm(0.85),  #high
-           prob_stay_lose_raw = qnorm(0.30), #lowish
-           epsilon_raw = qnorm(0.27)),  #some exploration
-    lambda = c(prob_stay_win = 2,
-               prob_stay_lose = 2,
-               epsilon = 2)
+    mu = c(
+      prob_stay_win_raw = true_params_raw$human$mu$prob_stay_win_raw,
+      prob_stay_lose_raw = true_params_raw$human$mu$prob_stay_lose_raw,
+      epsilon_raw = true_params_raw$human$mu$epsilon_raw
+    ),
+    lambda = c(
+      prob_stay_win = true_params_raw$human$lambda$prob_stay_win,
+      prob_stay_lose = true_params_raw$human$lambda$prob_stay_lose,
+      epsilon = true_params_raw$human$lambda$epsilon
+    )
   ),
-  # Group 2: GPT 2023 (old)
   gpt2023 = list(
-    mu = c(prob_stay_win_raw = qnorm(0.65), #lower
-           prob_stay_lose_raw = qnorm(0.50), #kinda high
-           epsilon_raw = qnorm(0.19)), #some exploration (slightly less)
-    lambda = c(prob_stay_win = 2,
-               prob_stay_lose = 2,
-               epsilon = 3)
+    mu = c(
+      prob_stay_win_raw = true_params_raw$gpt2023$mu$prob_stay_win_raw,
+      prob_stay_lose_raw = true_params_raw$gpt2023$mu$prob_stay_lose_raw,
+      epsilon_raw = true_params_raw$gpt2023$mu$epsilon_raw
+    ),
+    lambda = c(
+      prob_stay_win = true_params_raw$gpt2023$lambda$prob_stay_win,
+      prob_stay_lose = true_params_raw$gpt2023$lambda$prob_stay_lose,
+      epsilon = true_params_raw$gpt2023$lambda$epsilon
+    )
   ),
-  # Group 3: GPT 2025 (new)
   gpt2025 = list(
-    mu = c(prob_stay_win_raw = qnorm(0.92), #highest
-           prob_stay_lose_raw = qnorm(0.25), #low
-           epsilon_raw = qnorm(0.05)), #very little exploration
-    lambda = c(prob_stay_win = 4,
-               prob_stay_lose = 4,
-               epsilon = 10)
+    mu = c(
+      prob_stay_win_raw = true_params_raw$gpt2025$mu$prob_stay_win_raw,
+      prob_stay_lose_raw = true_params_raw$gpt2025$mu$prob_stay_lose_raw,
+      epsilon_raw = true_params_raw$gpt2025$mu$epsilon_raw
+    ),
+    lambda = c(
+      prob_stay_win = true_params_raw$gpt2025$lambda$prob_stay_win,
+      prob_stay_lose = true_params_raw$gpt2025$lambda$prob_stay_lose,
+      epsilon = true_params_raw$gpt2025$lambda$epsilon
+    )
   )
 )
 
 # Print true parameters
-cat("=== TRUE GROUP PARAMETERS ===\n")
+cat("=== TRUE GROUP PARAMETERS (from Python simulation) ===\n")
+phi <- function(x) pnorm(x)
 for (group_name in names(true_params)) {
   cat(sprintf("\n%s:\n", toupper(group_name)))
   mu <- true_params[[group_name]]$mu
@@ -72,51 +83,6 @@ for (group_name in names(true_params)) {
 }
 
 # ---------------------------
-# Helper functions
-# ---------------------------
-phi <- function(x) pnorm(x)
-translate_payoff <- function(payoff_df, scale=TRUE){
-  for(deck in c('A','B','C','D')){
-    payoff_df[[paste0(deck,'_outcome')]] <- payoff_df[[paste0('win_',deck)]] - payoff_df[[paste0('loss_',deck)]]
-  }
-  payoff_array <- as.matrix(payoff_df[, .(A_outcome,B_outcome,C_outcome,D_outcome)])
-  if(scale) payoff_array <- payoff_array/100
-  return(payoff_array)
-}
-
-simulate_subject <- function(payoff_array, n_trials, prob_stay_win, prob_stay_lose, epsilon){
-  x <- rep(NA, n_trials); X <- rep(NA, n_trials)
-  deck_counts <- rep(1, 4)
-  x[1] <- sample(1:4, 1)
-  X[1] <- as.numeric(payoff_array[deck_counts[x[1]], x[1]] >= 0)
-  deck_counts[x[1]] <- deck_counts[x[1]] + 1
-  for(t in 2:n_trials){
-    available_decks <- which(deck_counts <= nrow(payoff_array))
-    if(length(available_decks) == 0) break
-    if(runif(1) < epsilon){
-      x[t] <- sample(available_decks, 1)
-    } else {
-      last_choice <- x[t-1]; last_outcome <- X[t-1]
-      stay_prob <- if(last_outcome==1) prob_stay_win else prob_stay_lose
-      if(runif(1) < stay_prob && last_choice %in% available_decks){
-        x[t] <- last_choice
-      } else {
-        switch_options <- setdiff(available_decks, last_choice)
-        if(length(switch_options)==0) switch_options <- available_decks
-        x[t] <- sample(switch_options, 1)
-      }
-    }
-    idx <- deck_counts[x[t]]
-    X[t] <- as.numeric(payoff_array[idx, x[t]] >= 0)
-    deck_counts[x[t]] <- deck_counts[x[t]] + 1
-  }
-  valid <- !is.na(X)
-  list(x=x[valid], X=X[valid], n_trials=sum(valid))
-}
-
-payoff_array <- translate_payoff(payoff_df)
-
-# ---------------------------
 # Storage
 # ---------------------------
 results <- data.frame()
@@ -125,46 +91,55 @@ hyperparams <- data.frame()
 samples_list <- list()
 
 # ---------------------------
-# Simulation + Fit Loop
+# Parameter Recovery Loop
 # ---------------------------
 start_time <- Sys.time()
-cat("Simulation started:", format(start_time), "\n")
+cat("\n=== STARTING PARAMETER RECOVERY ===\n")
+cat("Total iterations to process:", n_simulations, "\n")
+cat("Analysis started:", format(start_time), "\n")
 
 for(sim in 1:n_simulations){
-  cat(sprintf("\n=== SIMULATION %d/%d ===\n", sim, n_simulations))
-  all_x <- list(); all_X <- list(); all_group <- c()
+  cat(sprintf("\n=== ITERATION %d/%d ===\n", sim, n_simulations))
   
+  # Extract data for this iteration
+  x_mat <- simulated_data$x[[sim]]
+  X_mat <- simulated_data$X[[sim]]
+  group_labels <- simulated_data$group[[sim]]
+  
+  # Convert Python 0-indexing to R 1-indexing for deck choices
+  x_mat <- x_mat + 1
+  
+  # Create group index (1=human, 2=gpt2023, 3=gpt2025)
+  group_idx <- sapply(group_labels, function(g) which(group_names == g))
+  
+  # Store hyperparameters for this iteration
   for(g in 1:length(group_names)){
-    group_name <- group_names[g]; mu_g <- true_params[[group_name]]$mu; lambda_g <- true_params[[group_name]]$lambda
-    hyperparams <- rbind(hyperparams,data.frame(
-      sim_id=sim, group=group_name,
-      mu_prob_stay_win=phi(mu_g[1]),
-      mu_prob_stay_lose=phi(mu_g[2]),
-      mu_epsilon=phi(mu_g[3]),
-      lambda_prob_stay_win=lambda_g[1],
-      lambda_prob_stay_lose=lambda_g[2],
-      lambda_epsilon=lambda_g[3]
-    ))
+    group_name <- group_names[g]
+    mu_g <- true_params[[group_name]]$mu
+    lambda_g <- true_params[[group_name]]$lambda
     
-    for(s in 1:n_subjects_per_group){
-      prob_stay_win_s <- phi(rnorm(1, mu_g[1], 1/sqrt(lambda_g[1])))
-      prob_stay_lose_s <- phi(rnorm(1, mu_g[2], 1/sqrt(lambda_g[2])))
-      epsilon_s <- phi(rnorm(1, mu_g[3], 1/sqrt(lambda_g[3])))
-      sim_s <- simulate_subject(payoff_array, n_trials, prob_stay_win_s, prob_stay_lose_s, epsilon_s)
-      all_x[[length(all_x)+1]] <- sim_s$x
-      all_X[[length(all_X)+1]] <- sim_s$X
-      all_group <- c(all_group,g)
-    }
+    hyperparams <- rbind(hyperparams, data.frame(
+      sim_id = sim,
+      group = group_name,
+      mu_prob_stay_win = phi(mu_g[1]),
+      mu_prob_stay_lose = phi(mu_g[2]),
+      mu_epsilon = phi(mu_g[3]),
+      lambda_prob_stay_win = lambda_g[1],
+      lambda_prob_stay_lose = lambda_g[2],
+      lambda_epsilon = lambda_g[3]
+    ))
   }
   
-  max_trials <- max(sapply(all_X,length))
-  x_mat <- t(sapply(all_x, function(v){c(v, rep(NA,max_trials-length(v)))}))
-  X_mat <- t(sapply(all_X, function(v){c(v, rep(NA,max_trials-length(v)))}))
+  # Prepare data for JAGS
+  # Convert outcomes to binary (win=1, lose=0)
+  X_binary <- ifelse(X_mat >= 0, 1, 0)
   
   jags_data <- list(
-    x = x_mat, X = X_mat,
-    ntrials = apply(!is.na(X_mat),1,sum),
-    nsubs = length(all_x), group = all_group,
+    x = x_mat,
+    X = X_binary,
+    ntrials = apply(!is.na(x_mat), 1, sum),
+    nsubs = nrow(x_mat),
+    group = group_idx,
     n_groups = 3
   )
   
@@ -239,17 +214,28 @@ for(sim in 1:n_simulations){
   # ---------------------------
   # Probability-scale recovery table
   # ---------------------------
+  results$rec_mu_prob_stay_win_prob <- NA
+  results$rec_mu_prob_stay_lose_prob <- NA
+  results$rec_mu_epsilon_prob <- NA
+  results$true_mu_prob_stay_win_prob <- NA
+  results$true_mu_prob_stay_lose_prob <- NA
+  results$true_mu_epsilon_prob <- NA
+  
   for(g in 1:length(group_names)){
     group_name <- group_names[g]
+    
+    # Calculate probability-scale values
+    rec_probs <- t(apply(results[results$group==group_name, c("rec_mu_prob_stay_win","rec_mu_prob_stay_lose","rec_mu_epsilon")],1,phi))
+    true_probs <- t(apply(results[results$group==group_name, c("true_mu_prob_stay_win","true_mu_prob_stay_lose","true_mu_epsilon")],1,phi))
+    
+    # Assign to initialized columns
     results[results$group==group_name, c("rec_mu_prob_stay_win_prob",
                                          "rec_mu_prob_stay_lose_prob",
-                                         "rec_mu_epsilon_prob")] <-
-      t(apply(results[results$group==group_name, c("rec_mu_prob_stay_win","rec_mu_prob_stay_lose","rec_mu_epsilon")],1,phi))
+                                         "rec_mu_epsilon_prob")] <- rec_probs
     
     results[results$group==group_name, c("true_mu_prob_stay_win_prob",
                                          "true_mu_prob_stay_lose_prob",
-                                         "true_mu_epsilon_prob")] <-
-      t(apply(results[results$group==group_name, c("true_mu_prob_stay_win","true_mu_prob_stay_lose","true_mu_epsilon")],1,phi))
+                                         "true_mu_epsilon_prob")] <- true_probs
   }
   
   # ---------------------------
@@ -265,10 +251,6 @@ for(sim in 1:n_simulations){
 # ---------------------------
 saveRDS(samples_list, file.path(results_dir,"samples_list.rds"))
 saveRDS(true_params, file.path(results_dir,"true_params.rds"))
-
-# ============================================================================
-# COMPUTE BIAS / RMSE / CORRELATION METRICS
-# ============================================================================
 
 # ---------------------------
 # Group parameter recovery metrics

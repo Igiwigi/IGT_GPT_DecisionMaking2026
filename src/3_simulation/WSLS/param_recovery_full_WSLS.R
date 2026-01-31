@@ -2,14 +2,13 @@
 # GROUP & INDIV PARAMETER RECOVERY - HIERARCHICAL WSLS (win-stay / lose-stay + epsilon)
 # ============================================================================
 #need to report corr (true vs recovered), bias, slope (they're included, but only at the end right now)
-#bit of a messy monster
+#bit of a mess (added some rhat prints)
 
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite)
 
 # setup
 set.seed(1234)
-
 root_path <- "~/IGT_LLM_DecisionMaking"
 filename <- "simulated_group_winlose.json"
 file <- file.path(root_path, "src/3_simulation/WSLS/recovery/simulated_data", filename)
@@ -17,15 +16,7 @@ file <- file.path(root_path, "src/3_simulation/WSLS/recovery/simulated_data", fi
 # Load JSON simulated group data
 data <- jsonlite::fromJSON(file)
 
-# ---------------------------
-# HELPER FUNCTION
-# ---------------------------
-MPD <- function(x) { #this takes the mode
-  x <- as.numeric(x)
-  if(length(x) == 0 || all(is.na(x))) return(NA)
-  d <- density(x)
-  d$x[which.max(d$y)]
-}
+#using median not mode!!
 
 # ---------------------------
 # SETUP
@@ -54,6 +45,11 @@ indiv_params <- c("prob_stay_win", "prob_stay_lose", "epsilon")  # For JAGS outp
 indiv_params_json <- c("prob_stay_win_sub", "prob_stay_lose_sub", "epsilon_sub")  # From JSON
 true_indiv <- array(NA, dim=c(n_groups, max_nsubs, length(indiv_params)))
 infer_indiv <- array(NA, dim=c(n_groups, max_nsubs, length(indiv_params)))
+
+#rhat param storage
+group_params <- c(params, lambda_params)
+rhat_vals <- matrix(NA, nrow=n_groups, ncol=length(group_params))
+colnames(rhat_vals) <- paste0("Rhat_", group_params)
 
 # Convergence diagnostics storage
 max_rhat <- rep(NA, n_groups)
@@ -190,18 +186,18 @@ for (i in 1:n_groups) {
   
   sims <- samples$BUGSoutput$sims.list
   
-  # store true and inferred group means
+  # store true and inferred group means (using median instead of MPD)
   true_mu[i, ] <- c(mu_prob_stay_win_raw, mu_prob_stay_lose_raw, mu_epsilon_raw)
-  infer_mu[i, ] <- sapply(params, function(p) MPD(sims[[p]]))
+  infer_mu[i, ] <- sapply(params, function(p) median(sims[[p]]))
   
-  # store true and inferred group lambdas
+  # store true and inferred group lambdas (using median instead of MPD)
   true_lambda[i, ] <- c(lambda_prob_stay_win, lambda_prob_stay_lose, lambda_epsilon)
-  infer_lambda[i, ] <- sapply(lambda_params, function(p) MPD(sims[[p]]))
+  infer_lambda[i, ] <- sapply(lambda_params, function(p) median(sims[[p]]))
   
-  # store inferred individual parameters
+  # store inferred individual parameters (using median instead of MPD)
   for(p_idx in 1:length(indiv_params)) {
     p <- indiv_params[p_idx]
-    infer_indiv[i, 1:nsubs, p_idx] <- apply(sims[[p]], 2, MPD)
+    infer_indiv[i, 1:nsubs, p_idx] <- apply(sims[[p]], 2, median)
   }
   
   if(max_rhat[i] > 1.1) {
@@ -211,6 +207,18 @@ for (i in 1:n_groups) {
   # ---------------------------
   # SAVE INCREMENTAL RESULTS - GROUP LEVEL
   # ---------------------------
+  
+  #rhat for each grp
+  for (p_idx in seq_along(group_params)) {
+    p <- group_params[p_idx]
+    if (p %in% rownames(summary_mat)) {
+      rhat_vals[i, p_idx] <- summary_mat[p, "Rhat"]
+    } else {
+      rhat_vals[i, p_idx] <- NA
+    }
+  }
+  
+  #dataframe itself
   df_group <- data.frame(
     group_id = 1:n_groups,
     nsubs = n_subjects,
@@ -227,8 +235,10 @@ for (i in 1:n_groups) {
     true_lambda_epsilon = true_lambda[,3],
     infer_lambda_prob_stay_win = infer_lambda[,1],
     infer_lambda_prob_stay_lose = infer_lambda[,2],
-    infer_lambda_epsilon = infer_lambda[,3]
+    infer_lambda_epsilon = infer_lambda[,3],
+    rhat_vals #rhat vals
   )
+  
   
   write.csv(df_group, csv_file, row.names = FALSE)
   cat(sprintf("Saved group-level results to %s\n", basename(csv_file)))
@@ -449,7 +459,9 @@ df_diag$bad_rhat <- df_diag$max_rhat > 1.1
 # Summaries
 cat("\nMean transformed parameters by Rhat group:\n")
 print(aggregate(
-  cbind(true_prob_stay_win, true_prob_stay_lose, true_epsilon_prob) ~ bad_rhat,
+  cbind(true_prob_stay_win, true_prob_stay_lose, true_epsilon_prob,
+        Rhat_mu_prob_stay_win_raw, Rhat_mu_prob_stay_lose_raw, Rhat_mu_epsilon_raw,
+        Rhat_lambda_prob_stay_win, Rhat_lambda_prob_stay_lose, Rhat_lambda_epsilon) ~ bad_rhat,
   data = df_diag,
   FUN = mean,
   na.rm = TRUE

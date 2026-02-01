@@ -72,7 +72,8 @@ true_params <- list(
 
 # Print true parameters
 cat("=== TRUE GROUP PARAMETERS (from Python simulation) ===\n")
-phi <- function(x) pnorm(x)
+probit_to_prob <- function(x) pnorm(x)
+
 for (group_name in names(true_params)) {
   cat(sprintf("\n%s:\n", toupper(group_name)))
   mu <- true_params[[group_name]]$mu
@@ -121,9 +122,9 @@ for(sim in 1:n_simulations){
     hyperparams <- rbind(hyperparams, data.frame(
       sim_id = sim,
       group = group_name,
-      mu_prob_stay_win = phi(mu_g[1]),
-      mu_prob_stay_lose = phi(mu_g[2]),
-      mu_epsilon = phi(mu_g[3]),
+      mu_prob_stay_win = probit_to_prob(mu_g[1]),
+      mu_prob_stay_lose = probit_to_prob(mu_g[2]),
+      mu_epsilon = probit_to_prob(mu_g[3]),
       lambda_prob_stay_win = lambda_g[1],
       lambda_prob_stay_lose = lambda_g[2],
       lambda_epsilon = lambda_g[3]
@@ -199,12 +200,12 @@ for(sim in 1:n_simulations){
       rec_lambda_prob_stay_win=median(samples$BUGSoutput$sims.list$lambda_prob_stay_win[,g]),
       rec_lambda_prob_stay_lose=median(samples$BUGSoutput$sims.list$lambda_prob_stay_lose[,g]),
       rec_lambda_epsilon=median(samples$BUGSoutput$sims.list$lambda_epsilon[,g]),
-      true_mu_prob_stay_win_prob = phi(true_mu[1]),
-      true_mu_prob_stay_lose_prob = phi(true_mu[2]),
-      true_mu_epsilon_prob = phi(true_mu[3]),
-      rec_mu_prob_stay_win_prob = phi(rec_mu_prob_stay_win),
-      rec_mu_prob_stay_lose_prob = phi(rec_mu_prob_stay_lose),
-      rec_mu_epsilon_prob = phi(rec_mu_epsilon),
+      true_mu_prob_stay_win_prob = probit_to_prob(true_mu[1]),
+      true_mu_prob_stay_lose_prob = probit_to_prob(true_mu[2]),
+      true_mu_epsilon_prob = probit_to_prob(true_mu[3]),
+      rec_mu_prob_stay_win_prob = probit_to_prob(rec_mu_prob_stay_win),
+      rec_mu_prob_stay_lose_prob = probit_to_prob(rec_mu_prob_stay_lose),
+      rec_mu_epsilon_prob = probit_to_prob(rec_mu_epsilon),
       min_ess=min(summary_mat[param_rows_group,"n.eff"],na.rm=TRUE),
       max_rhat=max(summary_mat[param_rows_group,"Rhat"],na.rm=TRUE),
       rhat_prob_stay_win = summary_mat[paste0("mu_prob_stay_win_raw[",g,"]"), "Rhat"],
@@ -262,8 +263,8 @@ for(group_name in group_names){
     rec <- res_g[[paste0("rec_mu_", param)]]
     true <- res_g[[paste0("true_mu_", param)]]
     
-    rec_prob <- phi(rec)
-    true_prob <- phi(true)
+    rec_prob <- probit_to_prob(rec)
+    true_prob <- probit_to_prob(true)
     
     bias <- mean(rec_prob - true_prob, na.rm=TRUE)
     rmse <- sqrt(mean((rec_prob - true_prob)^2, na.rm=TRUE))

@@ -2,7 +2,7 @@
 # POST-HOC VISUALIZATION EDITOR FOR GROUP DIFFERENCE RECOVERY
 # ============================================================================
 # This script loads the saved results from the parameter recovery simulation & makes plots
-# gotta make the plots better for reporting & prettier
+# gotta make the plots better for reporting & prettier (this has been sloppily thrown together)
 # ============================================================================
 
 library(pacman)
@@ -436,11 +436,9 @@ mtext("Group Difference Recovery",
 dev.off()
 
 # ============================================================================
-# PLOT 5: GGPLOT2 VERSION - PUBLICATION QUALITY
+# PLOT 5: RECOVERY PLOT SCATTER
 # ============================================================================
-cat("\n=== Creating ggplot2 publication-quality plots ===\n")
-
-# Prepare data for ggplot
+# Prepare data for ggplot (get true, recovered, and them as prob)
 plot_data <- results %>%
   select(sim_id, group, starts_with("true_mu_"), starts_with("rec_mu_")) %>%
   pivot_longer(
@@ -692,8 +690,8 @@ cat("  3. recovery_gpt2025_params.png\n")
 cat("  4. recovery_all_groups_combined.png\n")
 cat("  5. recovery_lambda_precision.png\n")
 cat("  6. recovery_group_contrasts.png\n")
-cat("  7. recovery_ggplot_scatter.png (publication quality)\n")
-cat("  8. recovery_distributions.png (publication quality)\n")
+cat("  7. recovery_ggplot_scatter.png\n")
+cat("  8. recovery_distributions.png\n")
 cat("  9. recovery_bias_rmse_comparison.png\n")
 cat(" 10. recovery_summary_stats.csv\n")
 cat(" 11. comprehensive_recovery_summary.csv\n\n")

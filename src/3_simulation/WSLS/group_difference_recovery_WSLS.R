@@ -186,6 +186,7 @@ for(sim in 1:n_simulations){
     rec_mu_epsilon <- median(samples$BUGSoutput$sims.list$mu_epsilon_raw[,g])
     
     #what to keep in results (true, recovered, rhat, etc)
+    #kinda messy naming!!! (confusing which is probit and which is prob)
     results <- rbind(results,data.frame(
       sim_id=sim, group=group_name,
       true_mu_prob_stay_win=true_mu[1],
@@ -200,7 +201,7 @@ for(sim in 1:n_simulations){
       rec_lambda_prob_stay_win=median(samples$BUGSoutput$sims.list$lambda_prob_stay_win[,g]),
       rec_lambda_prob_stay_lose=median(samples$BUGSoutput$sims.list$lambda_prob_stay_lose[,g]),
       rec_lambda_epsilon=median(samples$BUGSoutput$sims.list$lambda_epsilon[,g]),
-      true_mu_prob_stay_win_prob = probit_to_prob(true_mu[1]),
+      true_mu_prob_stay_win_prob = probit_to_prob(true_mu[1]), #taking probability, can be omitted maybe
       true_mu_prob_stay_lose_prob = probit_to_prob(true_mu[2]),
       true_mu_epsilon_prob = probit_to_prob(true_mu[3]),
       rec_mu_prob_stay_win_prob = probit_to_prob(rec_mu_prob_stay_win),
@@ -265,7 +266,7 @@ for(group_name in group_names){
     
     rec_prob <- probit_to_prob(rec)
     true_prob <- probit_to_prob(true)
-    
+
     bias <- mean(rec_prob - true_prob, na.rm=TRUE)
     rmse <- sqrt(mean((rec_prob - true_prob)^2, na.rm=TRUE))
     
@@ -296,17 +297,17 @@ for(param in param_names){
     true_col <- paste0("true_diff_", contrast)
     rec_col <- paste0("rec_diff_", contrast)
     
-    r <- cor(con_p[[true_col]], con_p[[rec_col]], use="complete.obs")
+    #r <- cor(con_p[[true_col]], con_p[[rec_col]], use="complete.obs") #the sd is 0, not informative
     bias <- mean(con_p[[rec_col]] - con_p[[true_col]], na.rm=TRUE)
     rmse <- sqrt(mean((con_p[[rec_col]] - con_p[[true_col]])^2, na.rm=TRUE))
     
-    cat(sprintf("%s | %s: bias=%.3f, r=%.3f, RMSE=%.3f\n", param, contrast, bias, r, rmse))
+    cat(sprintf("%s | %s: bias=%.3f, RMSE=%.3f\n", param, contrast, bias, rmse))
     
     contrast_metrics <- rbind(contrast_metrics, data.frame(
       parameter = param,
       contrast = contrast,
       bias = bias,
-      r = r,
+      #r = r, #the SD is 0
       rmse = rmse
     ))
   }

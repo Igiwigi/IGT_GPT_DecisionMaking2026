@@ -1,13 +1,12 @@
 # ============================================================================
 # POST-HOC VISUALIZATION EDITOR FOR GROUP DIFFERENCE RECOVERY
 # ============================================================================
-# This script loads the saved results from the parameter recovery simulation
-# and creates/edits visualizations without re-running the full simulation.
-# (should have split the visualization code from the analysis code originally...)
+# This script loads the saved results from the parameter recovery simulation & makes plots
+# gotta make the plots better for reporting & prettier
 # ============================================================================
 
 library(pacman)
-pacman::p_load(ggplot2, reshape2, viridis, dplyr, tidyr, gridExtra, cowplot)
+pacman::p_load(ggplot2, dplyr, tidyr, gridExtra, cowplot)
 
 # ---------------------------
 # CONFIGURATION

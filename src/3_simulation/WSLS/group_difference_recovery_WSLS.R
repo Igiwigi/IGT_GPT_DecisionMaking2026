@@ -24,7 +24,7 @@ simulated_data <- fromJSON(simulated_data_file)
 # ---------------------------
 # SIMULATION PARAMETERS
 # ---------------------------
-n_simulations <- length(simulated_data$iteration)
+n_simulations <- length(simulated_data$iteration) #this is 30; can do less for testing 
 group_names <- c("human", "gpt2023", "gpt2025")
 
 # Extract TRUE parameters from the first iteration (they're the same for all iterations)
@@ -156,6 +156,17 @@ for(sim in 1:n_simulations){
   )
   cat(sprintf("Completed in %.2f minutes\n", as.numeric(difftime(Sys.time(), sim_start, units="mins"))))
   
+  # Estimate time remaining
+  elapsed_time <- as.numeric(difftime(Sys.time(), start_time, units="mins"))
+  avg_time_per_sim <- elapsed_time / sim
+  remaining_sims <- n_simulations - sim
+  estimated_remaining <- avg_time_per_sim * remaining_sims
+  estimated_total <- avg_time_per_sim * n_simulations
+  
+  cat(sprintf("Progress: %d/%d (%.1f%%) | Elapsed: %.1f min | Est. remaining: %.1f min | Est. total: %.1f min\n",
+              sim, n_simulations, (sim/n_simulations)*100, 
+              elapsed_time, estimated_remaining, estimated_total))
+  
   samples_list[[sim]] <- samples$BUGSoutput$sims.list
   summary_mat <- samples$BUGSoutput$summary
   
@@ -173,6 +184,7 @@ for(sim in 1:n_simulations){
     rec_mu_prob_stay_lose <- median(samples$BUGSoutput$sims.list$mu_prob_stay_lose_raw[,g])
     rec_mu_epsilon <- median(samples$BUGSoutput$sims.list$mu_epsilon_raw[,g])
     
+    #what to keep in results (true, recovered, rhat, etc)
     results <- rbind(results,data.frame(
       sim_id=sim, group=group_name,
       true_mu_prob_stay_win=true_mu[1],
@@ -187,8 +199,20 @@ for(sim in 1:n_simulations){
       rec_lambda_prob_stay_win=median(samples$BUGSoutput$sims.list$lambda_prob_stay_win[,g]),
       rec_lambda_prob_stay_lose=median(samples$BUGSoutput$sims.list$lambda_prob_stay_lose[,g]),
       rec_lambda_epsilon=median(samples$BUGSoutput$sims.list$lambda_epsilon[,g]),
+      true_mu_prob_stay_win_prob = phi(true_mu[1]),
+      true_mu_prob_stay_lose_prob = phi(true_mu[2]),
+      true_mu_epsilon_prob = phi(true_mu[3]),
+      rec_mu_prob_stay_win_prob = phi(rec_mu_prob_stay_win),
+      rec_mu_prob_stay_lose_prob = phi(rec_mu_prob_stay_lose),
+      rec_mu_epsilon_prob = phi(rec_mu_epsilon),
+      min_ess=min(summary_mat[param_rows_group,"n.eff"],na.rm=TRUE),
       max_rhat=max(summary_mat[param_rows_group,"Rhat"],na.rm=TRUE),
-      min_ess=min(summary_mat[param_rows_group,"n.eff"],na.rm=TRUE)
+      rhat_prob_stay_win = summary_mat[paste0("mu_prob_stay_win_raw[",g,"]"), "Rhat"],
+      rhat_prob_stay_lose = summary_mat[paste0("mu_prob_stay_lose_raw[",g,"]"), "Rhat"],
+      rhat_epsilon = summary_mat[paste0("mu_epsilon_raw[",g,"]"), "Rhat"],
+      rhat_lambda_prob_stay_win = summary_mat[paste0("lambda_prob_stay_win[",g,"]"), "Rhat"],
+      rhat_lambda_prob_stay_lose = summary_mat[paste0("lambda_prob_stay_lose[",g,"]"), "Rhat"],
+      rhat_lambda_epsilon = summary_mat[paste0("lambda_epsilon[",g,"]"), "Rhat"]
     ))
   }
   
@@ -209,33 +233,6 @@ for(sim in 1:n_simulations){
       rec_diff_gpt2025_human=rec_vals[3]-rec_vals[1],
       rec_diff_gpt2025_gpt2023=rec_vals[3]-rec_vals[2]
     ))
-  }
-  
-  # ---------------------------
-  # Probability-scale recovery table
-  # ---------------------------
-  results$rec_mu_prob_stay_win_prob <- NA
-  results$rec_mu_prob_stay_lose_prob <- NA
-  results$rec_mu_epsilon_prob <- NA
-  results$true_mu_prob_stay_win_prob <- NA
-  results$true_mu_prob_stay_lose_prob <- NA
-  results$true_mu_epsilon_prob <- NA
-  
-  for(g in 1:length(group_names)){
-    group_name <- group_names[g]
-    
-    # Calculate probability-scale values
-    rec_probs <- t(apply(results[results$group==group_name, c("rec_mu_prob_stay_win","rec_mu_prob_stay_lose","rec_mu_epsilon")],1,phi))
-    true_probs <- t(apply(results[results$group==group_name, c("true_mu_prob_stay_win","true_mu_prob_stay_lose","true_mu_epsilon")],1,phi))
-    
-    # Assign to initialized columns
-    results[results$group==group_name, c("rec_mu_prob_stay_win_prob",
-                                         "rec_mu_prob_stay_lose_prob",
-                                         "rec_mu_epsilon_prob")] <- rec_probs
-    
-    results[results$group==group_name, c("true_mu_prob_stay_win_prob",
-                                         "true_mu_prob_stay_lose_prob",
-                                         "true_mu_epsilon_prob")] <- true_probs
   }
   
   # ---------------------------

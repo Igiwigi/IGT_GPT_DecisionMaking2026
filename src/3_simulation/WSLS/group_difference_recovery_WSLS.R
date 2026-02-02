@@ -4,6 +4,7 @@
 # ============================================================================
 # This script runs the parameter recovery simulation and saves all results (to see group difference recovery!!)
 # Run visualization script separately after this completes!!
+# a bit of a mess unfortunately (could have done this cleaner)
 
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite, data.table)
@@ -72,6 +73,7 @@ true_params <- list(
 
 # Print true parameters
 cat("=== TRUE GROUP PARAMETERS (from Python simulation) ===\n")
+
 probit_to_prob <- function(x) pnorm(x)
 
 for (group_name in names(true_params)) {

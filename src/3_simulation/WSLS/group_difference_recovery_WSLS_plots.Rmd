@@ -33,14 +33,14 @@ dir.create(plot_dir, showWarnings = FALSE)
 # CONSTANTS
 # ---------------------------
 GROUPS <- c("human", "gpt2023", "gpt2025")
-GROUP_COLORS <- c(human = "#3498db", gpt2023 = "#e74c3c", gpt2025 = "#2ecc71")
+GROUP_COLORS <- c(human = "#3498db", gpt2023 = "#e74c3c", gpt2025 = "#fcc200")
 
 CONTRAST_NAMES <- c(
 gpt2023_human   = "GPT-2023 − Human",
 gpt2025_human   = "GPT-2025 − Human",
 gpt2025_gpt2023 = "GPT-2025 − GPT-2023"
 )
-CONTRAST_COLORS <- c("#e67e22", "#9b59b6", "#34495e")
+CONTRAST_COLORS <- c("purple", "#27C237", "orange")
 
 PARAMS <- c("prob_stay_win", "prob_stay_lose", "epsilon")
 PARAM_LABELS <- c(
@@ -73,7 +73,7 @@ recovery_stats <- function(true, rec) {
 # ---------------------------
 results <- read.csv(file.path(results_dir, "group_params_recovery.csv"))
 
-#in probit
+#contrasts (in probit space)
 contrasts <- read.csv(file.path(results_dir, "group_contrasts_recovery.csv"))
 
 samples_list <- readRDS(file.path(results_dir, "samples_list.rds"))
@@ -85,7 +85,7 @@ true_params  <- readRDS(file.path(results_dir, "true_params.rds"))
 # 1. GROUP μ RECOVERY
 # ---------------------------
 ```{r}
-#add the true value and then the mean? (like sam did)
+# mby add the true value and then the mean? (like sam did) (not necessary?)
 
 # Pivot results to long format
 mu_long <- results %>%
@@ -138,13 +138,13 @@ mu_plots <- map(PARAMS, function(param){
                color = "black", size = 4) +
     scale_color_manual(values = GROUP_COLORS) +
     scale_shape_manual(values = c("True Value" = 17, "Recovered" = 16), 
-                       name = NULL) +
+                       name = "Point Type:") +
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", linewidth = 1)+ #identity line (perfect recovery)
     labs(
       title = PARAM_LABELS[param],
       x = "True Probability",
       y = "Recovered Probability",
-      color = "Group"
+      color = "Group:"
     ) +
     theme_bw() +
     theme(
@@ -158,9 +158,13 @@ mu_plots <- map(PARAMS, function(param){
     )
 })
 
-combined_mu <- ggarrange(plotlist = mu_plots, nrow = 1, common.legend = TRUE, legend = "top")
+combined_mu <- ggarrange(plotlist = mu_plots, nrow = 1, common.legend = TRUE, legend = "top") %>%
+  annotate_figure(
+    top = text_grob("Recovered Mu per Group (Probability Space)", 
+                    face = "bold", size = 14)
+  )
 ggsave(file.path(plot_dir, "mu_recovery_by_group_prob_ggplot.png"),
-       plot = combined_mu, width = 12, height = 4, dpi = 300)
+       plot = combined_mu, width = 12, height = 4, dpi = 300, bg = "white")
 ```
 
 # ---------------------------
@@ -168,18 +172,7 @@ ggsave(file.path(plot_dir, "mu_recovery_by_group_prob_ggplot.png"),
 # ---------------------------
 ```{r}
 #this is all in probit, not transformed to probability since its contrast (can't do this later without changing the data creation script)
-
-#SOMEHOW denote abs distance to 0 as the ordering (make it intuitive!!!)
-
-#contrasts:
-#sim_id 1
-#parameter 1
-#true_diff_gpt2023_human -0.6511129
-#true_diff_gpt2025_human 0.3686382
-#true_diff_gpt2025_gpt2023 1.0197511 
-#rec_diff_gpt2023_human -0.09810933
-#rec_diff_gpt2025_human 0.728904720
-#rec_diff_gpt2025_gpt2023 0.827014
+# need to denote that the ordering is by abs distance from 0 (could have been done smarter) (currently just showing where 0 is)
 
 contrast_long <- contrasts %>%
   pivot_longer(
@@ -223,18 +216,20 @@ contrast_plots <- map(PARAMS, function(param){
 
   ggplot(df, aes(x = true_diff, y = rec_diff, color = contrast)) +
     geom_point(size = 2, alpha = 0.7, aes(shape = "Recovered")) +
+    geom_point(data = data.frame(x = 0, y = 0),aes(x, y, shape = "Zero Point (Comparison Point)"),size = 5,color = "black")+
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", linewidth = 1) +
     scale_color_manual(values = CONTRAST_COLORS, labels = CONTRAST_NAMES)+
-    scale_shape_manual(name = "", values = c("Recovered" = 16, "True Value" = 17))+
+    scale_shape_manual(name = "Point Type:", values = c("Recovered" = 16, "True Value" = 17, "Zero Point (Comparison Point)" = 8))+ #all the shapes for the points
     labs(
       title = PARAM_LABELS[param],
-      x = "True Difference (probit)",
-      y = "Recovered Difference (probit)",
-      color = "Contrast"
+      x = "True Difference",
+      y = "Recovered Difference",
+      color = "Contrast:"
     ) +
     geom_point(data = true_vals, aes(x = true_mu, y = true_mu, shape = "True Value"), size = 4, color = "black")+
     theme_bw() +
-    theme(legend.position = "topleft") +
+    theme(legend.position = "top",
+          plot.title = element_text(hjust = 0.5)) +
     annotate(
       "text", x = min(df$true_diff), y = max(df$rec_diff),
       label = stats_label,
@@ -242,9 +237,13 @@ contrast_plots <- map(PARAMS, function(param){
     )
 })
 
-combined_contrast <- ggarrange(plotlist = contrast_plots, nrow = 1, common.legend = TRUE, legend = "top")
+combined_contrast <- ggarrange(plotlist = contrast_plots, nrow = 1, common.legend = TRUE, legend = "top") %>%
+  annotate_figure(
+    top = text_grob("Group Difference Contrasts (Probit-space): Ordering by |Distance| from 0", 
+                    face = "bold", size = 14)
+  )
 ggsave(file.path(plot_dir, "group_contrast_recovery_prob_ggplot.png"),
-       plot = combined_contrast, width = 12, height = 4, dpi = 300)
+       plot = combined_contrast, width = 12, height = 4, dpi = 300, bg = "white")
 ```
 
 
@@ -293,7 +292,7 @@ density_plots <- map(PARAMS, function(param){
       title = paste("Posterior Density of", PARAM_LABELS[param]),
       x = "Probability",
       y = "Density",
-      fill = "Group"
+      fill = "Group:"
     ) +
     theme_bw() +
     theme(
@@ -303,7 +302,11 @@ density_plots <- map(PARAMS, function(param){
 })
 
 # Combine and save
-combined_density <- ggarrange(plotlist = density_plots, nrow = 1, common.legend = TRUE, legend = "top")
+combined_density <- ggarrange(plotlist = density_plots, nrow = 1, common.legend = TRUE, legend = "top") %>%
+  annotate_figure(
+    top = text_grob("Density Plots of Recovered Mu Posteriors by Group (Probability Space)", 
+                    face = "bold", size = 14)
+  )
 ggsave(file.path(plot_dir, "mu_density_by_group_prob_ggplot.png"),
-       plot = combined_density, width = 12, height = 4, dpi = 300)
+       plot = combined_density, width = 12, height = 4, dpi = 300, bg = "white")
 ```

@@ -9,7 +9,7 @@ set.seed(2026)
 # -------------------------------
 # Paths and group names
 # -------------------------------
-root_path <- "C:/Users/Igiba/Documents/IGT_LLM_DecisionMaking"
+root_path <- "~/IGT_LLM_DecisionMaking"
 groups <- c("ahn_hc", "gpt_OLD_2023", "gpt_NEW_2025")  # human → old → new
 
 # -------------------------------
@@ -96,7 +96,7 @@ sim_df_all <- bind_rows(
 # -------------------------------
 # Save simulated subject-level parameters to CSV
 # -------------------------------
-save_file <- file.path(root_path, "src", "2_estimation", "WSLS",
+save_file <- file.path(root_path, "src", "2_estimation",
                        "posterior_predictive_checks", "parameter_level", 
                        "simulated_subjects_all_parameters_WSLS_model.csv")
 if(!dir.exists(dirname(save_file))) dir.create(dirname(save_file), recursive = TRUE)
@@ -119,7 +119,7 @@ sim_df_long$parameter <- factor(sim_df_long$parameter,
 plot_all <- ggplot(sim_df_long, aes(x=value, color=group)) +
   geom_density(size=1) +
   facet_wrap(~parameter, scales="free") +
-  theme_minimal() +
+  theme_bw() +
   labs(title="Parameter posterior predictive distributions across groups (WSLS MODEL)",
        x="Parameter value", 
        y="Density") +
@@ -127,7 +127,7 @@ plot_all <- ggplot(sim_df_long, aes(x=value, color=group)) +
   theme(text=element_text(size=14), 
         legend.title=element_blank())
 
-plot_file <- file.path(root_path, "src", "2_estimation", "WSLS",
+plot_file <- file.path(root_path, "src", "2_estimation",
                        "posterior_predictive_checks", "parameter_level", 
                        "posterior_predictive_all_parameters_WSLS_model.png")
 ggsave(plot_file, plot_all, width=12, height=6, dpi=400)
@@ -164,7 +164,7 @@ sd_plot <- ggplot(sd_table_all, aes(x=parameter, y=mean_SD, fill=group)) +
   theme(text=element_text(size=14), 
         legend.title=element_blank())
 
-plot_file_sd <- file.path(root_path, "src", "2_estimation", "WSLS",
+plot_file_sd <- file.path(root_path, "src", "2_estimation",
                           "posterior_predictive_checks", "parameter_level", 
                           "subject_level_SD_plot_WSLS_model.png")
 ggsave(plot_file_sd, sd_plot, width=10, height=6, dpi=400)

@@ -38,7 +38,7 @@ X <- X / 100
 x_pred <- samples$BUGSoutput$sims.list$x_pred
 n_sims <- dim(x_pred)[1]
 
-plot_dir <- file.path(root_path, "src", "2_estimation", "WSLS", 
+plot_dir <- file.path(root_path, "src", "2_estimation",
                       "posterior_predictive_checks", "posterior_predictive_plots")
 dir.create(plot_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -71,7 +71,7 @@ p1 <- ggplot() +
            vjust = 1.5, hjust = -0.1, color = "red", fontface = "bold", size = 5) +
   labs(title = paste("Total Switches (WSLS Model):", group_name),
        x = "Total Switches", y = "Count") +
-  theme_minimal(base_size = 14)
+  theme_bw(base_size = 14)
 
 ggsave(file.path(plot_dir, paste0("switches_WSLS_", group_name, ".png")),
        p1, width = 8, height = 6)
@@ -166,7 +166,7 @@ p4 <- ggplot(wsls_plot_data, aes(x = Strategy, y = Probability, fill = Type)) +
   ylim(0, 1) +
   labs(title = paste("Win-Stay / Lose-Switch (WSLS Model):", group_name),
        y = "Probability", x = "") +
-  theme_minimal(base_size = 14) +
+  theme_bw(base_size = 14) +
   theme(legend.position = "top")
 
 ggsave(file.path(plot_dir, paste0("wsls_WSLS_", group_name, ".png")),
@@ -176,7 +176,7 @@ ggsave(file.path(plot_dir, paste0("wsls_WSLS_", group_name, ".png")),
 # SUMMARY REPORT
 # ============================================================================
 
-summary_file <- file.path(root_path, "src", "2_estimation", "WSLS",
+summary_file <- file.path(root_path, "src", "2_estimation",
                           "posterior_predictive_checks", "posterior_predictive_plots", 
                           paste0("PPC_summary_WSLS_", group_name, ".txt"))
 

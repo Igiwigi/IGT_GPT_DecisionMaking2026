@@ -11,7 +11,7 @@ pacman::p_load(ggplot2, bayesplot)
 root_path <- "~/IGT_LLM_DecisionMaking"
 groups <- c("ahn_hc", "gpt_OLD_2023", "gpt_NEW_2025")
 param_path <- file.path(root_path, "src/2_estimation/results/simpler_models")
-cor_dir <- file.path(root_path, "src/2_estimation/WSLS/posterior_predictive_checks/parameter_correlations")
+cor_dir <- file.path(root_path, "src/2_estimation/posterior_predictive_checks/parameter_correlations")
 
 if(!dir.exists(cor_dir)) dir.create(cor_dir, recursive = TRUE)
 

@@ -2,15 +2,8 @@
 # VISUALIZATION FOR GROUP DIFFERENCE RECOVERY
 # ============================================================================
 # This script loads the saved results from the parameter recovery simulation & makes plots
+# Namely: a plot for mu recovery of groups, another for contrasts between groups, and density plots of recovered values
 # ============================================================================
-# show group recovery differences (mu and lambda) & a density plot for each
-
-# taking the prob of a (probit - probit = answer) is wrong!!! they should both be turned into probit before calculating --> there are issues, don't make the contrasts into probability, KEEP THEM AS PROBIT
-
-#the contrasts have bad accuracy due to the messiness of the recovered values, even though the recovered values are roughly "in order" per grp --> this is fine
-
-# CENTER THE PROBIT PLOTS AROUND 0 SOMEHOW SO THE ORDERING IS CLEARER
-
 
 ```{r}
 library(pacman)
@@ -49,22 +42,7 @@ prob_stay_lose = "P(Stay | Lose)",
 epsilon        = "Exploration (ε)"
 )
 
-probit_to_prob <- pnorm
-ROPE_WIDTH <- 0.05
-```
-
-
-```{r}
-# ---------------------------
-# HELPERS
-# ---------------------------
-recovery_stats <- function(true, rec) {
-  tibble(
-    RMSE = sqrt(mean((rec - true)^2)),
-    Bias = mean(rec - true),
-    r    = cor(true, rec) #SD is 0 for a lot of them
-  )
-}
+probit_to_prob <- pnorm(x) #function to convert probit to probability
 ```
 
 ```{r}
@@ -85,20 +63,18 @@ true_params  <- readRDS(file.path(results_dir, "true_params.rds"))
 # 1. GROUP μ RECOVERY
 # ---------------------------
 ```{r}
-# mby add the true value and then the mean? (like sam did) (not necessary?)
-
-# Pivot results to long format
+# Pivot results to long format (line up the datasets nicely)
 mu_long <- results %>%
   select(sim_id, group, starts_with("true_mu_"), starts_with("rec_mu_"), 
-         -ends_with("_prob")) %>%
+         -ends_with("_prob")) %>% #don't need this (probability)
   pivot_longer(
     cols = c(starts_with("true_mu_"), starts_with("rec_mu_")),
     names_to = c("type", "param"),
     names_pattern = "(true|rec)_mu_(.*)"
   ) %>%
-  mutate(value = probit_to_prob(value))
+  mutate(value = probit_to_prob(value)) #slightly redundant, taking probit and making it prob (even if prob already exists)
 
-# Pivot to wide for plotting (getting the vals)
+# Pivot to wide for plotting
 mu_wide <- mu_long %>%
   pivot_wider(names_from = type, values_from = value)
 
@@ -109,8 +85,8 @@ true_by_group <- mu_long %>%
   summarise(true_mu = unique(value), .groups = "drop")
 
 mu_plots <- map(PARAMS, function(param){
-  df <- mu_wide %>% filter(param == !!param) #combine them
-  true_vals <- true_by_group %>% filter(param == !!param) #unique operator
+  df <- mu_wide %>% filter(param == !!param) 
+  true_vals <- true_by_group %>% filter(param == !!param)
   
   # Calculate stats per group
   stats_by_group <- df %>%
@@ -121,7 +97,7 @@ mu_plots <- map(PARAMS, function(param){
       .groups = "drop"
     )
   
-  # Create stats label with per-group metrics
+  # Create stats label with per-group metrics (could have been a separate function)
   stats_label <- paste(
     sapply(1:nrow(stats_by_group), function(i) {
       sprintf("%s: RMSE=%.2f, Bias=%.2f",
@@ -132,6 +108,7 @@ mu_plots <- map(PARAMS, function(param){
     collapse = "\n"
   )
   
+  #actual plot (group mu recovery)
   ggplot(df, aes(x = true, y = rec, color = group)) +
     geom_point(aes(shape = "Recovered"), size = 2, alpha = 0.7) +
     geom_point(data = true_vals, aes(x = true_mu, y = true_mu, shape = "True Value"), 
@@ -158,11 +135,14 @@ mu_plots <- map(PARAMS, function(param){
     )
 })
 
+#combine with a title
 combined_mu <- ggarrange(plotlist = mu_plots, nrow = 1, common.legend = TRUE, legend = "top") %>%
   annotate_figure(
     top = text_grob("Recovered Mu per Group (Probability Space)", 
                     face = "bold", size = 14)
   )
+
+#save
 ggsave(file.path(plot_dir, "mu_recovery_by_group_prob_ggplot.png"),
        plot = combined_mu, width = 12, height = 4, dpi = 300, bg = "white")
 ```
@@ -171,9 +151,9 @@ ggsave(file.path(plot_dir, "mu_recovery_by_group_prob_ggplot.png"),
 # 2. GROUP CONTRAST RECOVERY (not in probability: in probit)
 # ---------------------------
 ```{r}
-#this is all in probit, not transformed to probability since its contrast (can't do this later without changing the data creation script)
-# need to denote that the ordering is by abs distance from 0 (could have been done smarter) (currently just showing where 0 is)
+#this is all in probit, not transformed to probability since contrast was calculated with probit --> pnorm(a) - pnorm(b) != pnorm(a-b)
 
+# Pivot contrasts to long format (getting the data)
 contrast_long <- contrasts %>%
   pivot_longer(
     cols = c(ends_with("gpt2023_human"), ends_with("gpt2025_human"), ends_with('gpt2025_gpt2023')),
@@ -181,6 +161,7 @@ contrast_long <- contrasts %>%
     names_pattern = "(true_diff|rec_diff)_(.*)" #true_diff, rec_diff
   )
 
+#getting true values for each contrast
 true_by_group <- contrast_long %>%
   filter(type == "true_diff") %>%
   group_by(contrast, parameter) %>%
@@ -214,6 +195,7 @@ contrast_plots <- map(PARAMS, function(param){
     collapse = "\n"
   )
 
+  #actual plot
   ggplot(df, aes(x = true_diff, y = rec_diff, color = contrast)) +
     geom_point(size = 2, alpha = 0.7, aes(shape = "Recovered")) +
     geom_point(data = data.frame(x = 0, y = 0),aes(x, y, shape = "Zero Point (Comparison Point)"),size = 5,color = "black")+
@@ -237,11 +219,13 @@ contrast_plots <- map(PARAMS, function(param){
     )
 })
 
+#combine with a title
 combined_contrast <- ggarrange(plotlist = contrast_plots, nrow = 1, common.legend = TRUE, legend = "top") %>%
   annotate_figure(
     top = text_grob("Group Difference Contrasts (Probit-space): Ordering by |Distance| from 0", 
-                    face = "bold", size = 14)
-  )
+                    face = "bold", size = 14))
+
+#save
 ggsave(file.path(plot_dir, "group_contrast_recovery_prob_ggplot.png"),
        plot = combined_contrast, width = 12, height = 4, dpi = 300, bg = "white")
 ```
@@ -251,6 +235,7 @@ ggsave(file.path(plot_dir, "group_contrast_recovery_prob_ggplot.png"),
 # 3. DENSITY PLOT OF THE RECOVERED VALUES VS THE ONE TRUE VALUE FOR EACH PARAM (THE GROUND TRUTH)
 # ---------------------------
 ```{r}
+#get the data using samples_list
 density_plots <- map(PARAMS, function(param){
   posterior_df <- bind_rows(lapply(1:length(samples_list), function(sim_id){
     samp <- samples_list[[sim_id]]
@@ -260,7 +245,7 @@ density_plots <- map(PARAMS, function(param){
       tibble(
         group = GROUPS[group_idx],
         value = probit_to_prob(samp[[param_col]][, group_idx]),
-        # we take the raws (non-probit) and convert to probabilities
+        # take the raws (non-probit) and convert to probabilities (can do since individual values)
         sim_id = sim_id
       )
     }))
@@ -274,9 +259,10 @@ density_plots <- map(PARAMS, function(param){
       param_name <- paste0(param, "_raw")
       probit_to_prob(true_params[[g]]$mu[[param_name]])
     })
-    #we take the raw value and turn it from probit to prob
+    #take the raw value and turn it from probit to prob
   )
   
+  #actual plot
   ggplot(posterior_df, aes(x = value, fill = group)) +
     geom_density(alpha = 0.5) +  
     facet_wrap(~group, scales = "fixed") + 
@@ -301,12 +287,11 @@ density_plots <- map(PARAMS, function(param){
     )
 })
 
-# Combine and save
+# Combine with title and save
 combined_density <- ggarrange(plotlist = density_plots, nrow = 1, common.legend = TRUE, legend = "top") %>%
   annotate_figure(
     top = text_grob("Density Plots of Recovered Mu Posteriors by Group (Probability Space)", 
-                    face = "bold", size = 14)
-  )
+                    face = "bold", size = 14))
 ggsave(file.path(plot_dir, "mu_density_by_group_prob_ggplot.png"),
        plot = combined_density, width = 12, height = 4, dpi = 300, bg = "white")
 ```

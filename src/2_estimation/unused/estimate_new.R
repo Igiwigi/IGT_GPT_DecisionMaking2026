@@ -13,7 +13,7 @@ pacman::p_load(R2jags, parallel)
 set.seed(1234)
 
 #set data grps
-groups <- c("ahn_hc", "gpt_OLD_2023", "gpt_NEW_2025")
+groups <- c("ahn_hc", "gpt_OLD_2023", "gpt_NEW_2025") # 1: human, 2: gpt_old, 3: gpt_new
 
 ### SECTION WHERE YOU CAN CHANGE THINGS ###
 fixed_theta <- TRUE # if FALSE then theta is estimated (included in params and a different model file is used)

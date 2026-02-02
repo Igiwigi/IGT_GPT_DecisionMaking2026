@@ -2,7 +2,7 @@
 # GROUP & INDIV PARAMETER RECOVERY - HIERARCHICAL WSLS (win-stay / lose-stay + epsilon)
 # ============================================================================
 #need to report corr (true vs recovered), bias, slope (they're included, but only at the end right now)
-#a bit of a mess unfortunately (could have done this cleaner, such as by plotting separately; cleaner plots will have to come later)
+#a bit of a mess unfortunately (could have done this cleaner, such as by plotting separately)
 
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite)

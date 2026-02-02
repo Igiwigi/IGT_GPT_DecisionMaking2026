@@ -4,10 +4,13 @@
 # This script loads the saved results from the parameter recovery simulation & makes plots
 # ============================================================================
 # show group recovery differences (mu and lambda) & a density plot for each
-# recheck if these make sense?? (esp the contrasts plot; maybe theyre calculated wrongly?)
 
-# taking the prob of a (probit - probit = answer) is wrong!!! they should both be turned into probit before calculating --> there are issues
-# dont convert the contrasts to probability!! --> or add that to the jags analysis script
+# taking the prob of a (probit - probit = answer) is wrong!!! they should both be turned into probit before calculating --> there are issues, don't make the contrasts into probability, KEEP THEM AS PROBIT
+
+#the contrasts have bad accuracy due to the messiness of the recovered values, even though the recovered values are roughly "in order" per grp --> this is fine
+
+# CENTER THE PROBIT PLOTS AROUND 0 SOMEHOW SO THE ORDERING IS CLEARER
+
 
 ```{r}
 library(pacman)
@@ -164,10 +167,11 @@ ggsave(file.path(plot_dir, "mu_recovery_by_group_prob_ggplot.png"),
 # 2. GROUP CONTRAST RECOVERY (not in probability: in probit)
 # ---------------------------
 ```{r}
-#this is all in probit, not transformed to probability since its contrast (can't do this later)
+#this is all in probit, not transformed to probability since its contrast (can't do this later without changing the data creation script)
+
+#SOMEHOW denote abs distance to 0 as the ordering (make it intuitive!!!)
 
 #contrasts:
-
 #sim_id 1
 #parameter 1
 #true_diff_gpt2023_human -0.6511129

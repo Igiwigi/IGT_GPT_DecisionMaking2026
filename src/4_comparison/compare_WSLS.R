@@ -1,7 +1,7 @@
 # ============================================================================
 # GROUP COMPARE AFTER VETTING MODEL
 # ============================================================================
-#WSLS script to compare parameters between the real groups (group level analysis after vetting the model)
+#WSLS script to compare the found parameters between the real groups
 #Is this just the same thing as the recovery script but fitted to real data? (adapt it to real data)
 # a bit of a mess (still need to finish)
 

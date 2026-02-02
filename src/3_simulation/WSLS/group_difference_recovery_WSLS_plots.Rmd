@@ -33,7 +33,7 @@ gpt2023_human   = "GPT-2023 − Human",
 gpt2025_human   = "GPT-2025 − Human",
 gpt2025_gpt2023 = "GPT-2025 − GPT-2023"
 )
-CONTRAST_COLORS <- c("purple", "#27C237", "orange")
+CONTRAST_COLORS <- c("purple", "orange", '#27C237' )
 
 PARAMS <- c("prob_stay_win", "prob_stay_lose", "epsilon")
 PARAM_LABELS <- c(
@@ -42,7 +42,7 @@ prob_stay_lose = "P(Stay | Lose)",
 epsilon        = "Exploration (ε)"
 )
 
-probit_to_prob <- pnorm(x) #function to convert probit to probability
+probit_to_prob <- pnorm #function to convert probit to probability
 ```
 
 ```{r}

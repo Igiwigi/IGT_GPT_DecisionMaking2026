@@ -1,0 +1,23 @@
+# ============================================================================
+# VISUALIZATION FOR THE FIT REAL DATA: group differences (contrasts) in terms of WSLS parameters & outcome differences
+# ============================================================================
+# This script loads the saved results from the 2 fittings (fit hier WSLS model & fit simple outcome model) & makes plots
+# Namely: one plot for WSLS parameters & contrasts, and one plot for outcome differences
+# ============================================================================
+
+```{r setup, include=FALSE}
+library(pacman)
+pacman::p_load(tidyverse, ggpubr)
+```
+
+```{r}
+# ---------------------------
+# PATHS
+# ---------------------------
+root_path <- "~/IGT_LLM_DecisionMaking"
+results_dir <- file.path(root_path, "src/4_comparison/results")
+
+plot_dir <- file.path(results_dir, "plots")
+dir.create(plot_dir, showWarnings = FALSE)
+```
+

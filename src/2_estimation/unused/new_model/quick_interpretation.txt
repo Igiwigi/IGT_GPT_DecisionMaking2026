@@ -1,2 +1,0 @@
-Chains really aren't mixing for NEW, indicating systematic issues (running with more iter will likely not help). 
-Problem is likely non-identifibiality of certain parameters, if I had to guess.

@@ -1,13 +1,15 @@
 # ============================================================================
 # VISUALIZATION FOR GROUP DIFFERENCE RECOVERY
 # ============================================================================
-# This script loads the saved results from the parameter recovery simulation & makes plots
+# This script loads the saved results from the parameter recovery simulation (group difference) & makes plots
 # Namely: a plot for mu recovery of groups, another for contrasts between groups, and density plots of recovered values
+# Also: some metrics for the density plot
+# ALL PLOTS (i think) NEED TO BE IN PROBABILITY SPACE, BUT RMSE AND SUCH NEED TO BE CALCULATED IN PROBIT SPACE IN ORDER TO BE MEANINGFUL FOR RECOVERY (otherwise they get squashed!)
 # ============================================================================
 
 ```{r}
 library(pacman)
-pacman::p_load(tidyverse, ggpubr)
+pacman::p_load(tidyverse, ggpubr, grid)
 ```
 
 ```{r}
@@ -15,7 +17,7 @@ pacman::p_load(tidyverse, ggpubr)
 # PATHS
 # ---------------------------
 root_path <- "~/IGT_LLM_DecisionMaking"
-results_dir <- file.path(root_path, "src/3_simulation/recovery/results/group_diff")
+results_dir <- file.path(root_path, "src/3_simulation/recovery/results/group_diff") 
 plot_dir <- file.path(results_dir, "plots")
 dir.create(plot_dir, showWarnings = FALSE)
 ```
@@ -29,9 +31,9 @@ GROUPS <- c("human", "gpt2023", "gpt2025")
 GROUP_COLORS <- c(human = "#3498db", gpt2023 = "#e74c3c", gpt2025 = "#fcc200")
 
 CONTRAST_NAMES <- c(
-gpt2023_human   = "GPT-2023 − Human",
-gpt2025_human   = "GPT-2025 − Human",
-gpt2025_gpt2023 = "GPT-2025 − GPT-2023"
+gpt2023_human   = "gpt23 − hc",
+gpt2025_human   = "gpt25 − hc",
+gpt2025_gpt2023 = "gpt25 − gpt23"
 )
 CONTRAST_COLORS <- c("purple", "#EB931A", '#27C237' )
 
@@ -42,25 +44,27 @@ prob_stay_lose = "P(Stay | Lose)",
 epsilon        = "Exploration (ε)"
 )
 
-probit_to_prob <- pnorm #function to convert probit to probability
+probit_to_prob <- pnorm #function to convert probit to probability (if needed)
 ```
 
 ```{r}
 # ---------------------------
 # LOAD DATA
 # ---------------------------
+#a mess params
 results <- read.csv(file.path(results_dir, "group_params_recovery.csv"))
 
-#contrasts (in probit space)
+#contrasts (in probit AND probability space)
 contrasts <- read.csv(file.path(results_dir, "group_contrasts_recovery.csv"))
 
+#samples & true params
 samples_list <- readRDS(file.path(results_dir, "samples_list.rds"))
 true_params  <- readRDS(file.path(results_dir, "true_params.rds"))
 ```
 
 
 # ---------------------------
-# 1. GROUP μ RECOVERY
+# 1. GROUP μ RECOVERY (plot in PROBABILITY space, metrics in PROBIT space to not deinflate them)
 # ---------------------------
 ```{r}
 # Pivot results to long format (line up the datasets nicely)
@@ -71,24 +75,33 @@ mu_long <- results %>%
     cols = c(starts_with("true_mu_"), starts_with("rec_mu_")),
     names_to = c("type", "param"),
     names_pattern = "(true|rec)_mu_(.*)"
-  ) %>%mutate(value = probit_to_prob(value)) #slightly redundant, taking probit and making it prob (even if prob already exists)
+  ) # Keep in probit space for now (this is the probit version)
 
-# Pivot to wide for plotting
-mu_wide <- mu_long %>%
+# Create probability version for plotting
+mu_long_prob <- mu_long %>%
+  mutate(value = probit_to_prob(value)) # Convert to probability space for display
+
+# Pivot to wide for plotting (probability space)
+mu_wide_prob <- mu_long_prob %>%
   pivot_wider(names_from = type, values_from = value)
 
-#get the true vals for each group
-true_by_group <- mu_long %>%
+# Pivot to wide for metrics calculation (probit space)
+mu_wide_probit <- mu_long %>%
+  pivot_wider(names_from = type, values_from = value)
+
+#get the true vals for each group (in probability space for plotting)
+true_by_group <- mu_long_prob %>%
   filter(type == "true") %>%
   group_by(group, param) %>%
   summarise(true_mu = unique(value), .groups = "drop")
 
 mu_plots <- map(PARAMS, function(param){
-  df <- mu_wide %>% filter(param == !!param) 
+  df_prob <- mu_wide_prob %>% filter(param == !!param) 
+  df_probit <- mu_wide_probit %>% filter(param == !!param)
   true_vals <- true_by_group %>% filter(param == !!param)
   
-  # Calculate stats per group
-  stats_by_group <- df %>%
+  # Calculate stats per group IN PROBIT SPACE
+  stats_by_group <- df_probit %>%
     group_by(group) %>%
     summarise(
       RMSE = sqrt(mean((rec - true)^2)),
@@ -99,7 +112,7 @@ mu_plots <- map(PARAMS, function(param){
   # Create stats label with per-group metrics (could have been a separate function)
   stats_label <- paste(
     sapply(1:nrow(stats_by_group), function(i) {
-      sprintf("%s: RMSE=%.2f, Bias=%.2f",
+      sprintf("%s: RMSE=%.2f Bias=%.2f",
               stats_by_group$group[i],
               stats_by_group$RMSE[i],
               stats_by_group$Bias[i])
@@ -107,8 +120,8 @@ mu_plots <- map(PARAMS, function(param){
     collapse = "\n"
   )
   
-  #actual plot (group mu recovery)
-  ggplot(df, aes(x = true, y = rec, color = group)) +
+  #actual plot (group mu recovery) - PLOT IN PROBABILITY SPACE
+  ggplot(df_prob, aes(x = true, y = rec, color = group)) +
     geom_point(aes(shape = "Recovered"), size = 2, alpha = 0.7) +
     geom_point(data = true_vals, aes(x = true_mu, y = true_mu, shape = "True Value"), 
                color = "black", size = 4) +
@@ -128,16 +141,16 @@ mu_plots <- map(PARAMS, function(param){
       plot.title = element_text(hjust = 0.5)
     ) +
     annotate(
-      "text", x = min(df$true), y = max(df$rec), 
+      "text", x = min(df_prob$true), y = max(df_prob$rec), 
       label = stats_label,
-      hjust = 0, vjust = 1, size = 3
+      hjust = 0, vjust = 1, size = 3, fontface="italic"
     )
 })
 
 #combine with a title
 combined_mu <- ggarrange(plotlist = mu_plots, nrow = 1, common.legend = TRUE, legend = "top") %>%
   annotate_figure(
-    top = text_grob("Recovered Mu per Group (Probability Space)", 
+    top = text_grob("Recovered Mu per Group (Probability Space Display, Probit Metrics)", 
                     face = "bold", size = 14)
   )
 
@@ -146,36 +159,47 @@ ggsave(file.path(plot_dir, "mu_recovery_by_group_prob_ggplot.png"),
        plot = combined_mu, width = 12, height = 4, dpi = 300, bg = "white")
 ```
 
+
 # ---------------------------
-# 2. GROUP CONTRAST RECOVERY (not in probability: in probit)
+# 2. GROUP CONTRAST RECOVERY (plot in PROBABILITY space, metrics in PROBIT space to not deinflate them)
 # ---------------------------
 ```{r}
-#this is all in probit, not transformed to probability since contrast was calculated with probit --> pnorm(a) - pnorm(b) != pnorm(a-b)
-
-# Pivot contrasts to long format (getting the data)
-contrast_long <- contrasts %>%
+# Pivot contrasts to long format (getting the data) - separate probit and prob versions (both are calculated as contrasts in group_diff_recovery)
+contrast_long_probit <- contrasts %>%
   pivot_longer(
-    cols = c(ends_with("gpt2023_human"), ends_with("gpt2025_human"), ends_with('gpt2025_gpt2023')),
+    cols = c(ends_with("_probit")),
     names_to = c("type", "contrast"),
-    names_pattern = "(true_diff|rec_diff)_(.*)" #true_diff, rec_diff
+    names_pattern = "(true_diff|rec_diff)_(.*)_probit"
   )
 
-#getting true values for each contrast
-true_by_group <- contrast_long %>%
+contrast_long_prob <- contrasts %>%
+  pivot_longer(
+    cols = c(ends_with("_prob")),
+    names_to = c("type", "contrast"),
+    names_pattern = "(true_diff|rec_diff)_(.*)_prob"
+  )
+
+#getting true values for each contrast (in probability space for plotting)
+true_by_group <- contrast_long_prob %>%
   filter(type == "true_diff") %>%
   group_by(contrast, parameter) %>%
   summarise(true_mu = unique(value), .groups = "drop")
 
-# Pivot wide for plotting (has the true and rec next to each other!!! nicely)
-contrast_wide <- contrast_long %>%
+# Pivot wide for plotting (probability space - has the true and rec next to each other!!! nicely)
+contrast_wide_prob <- contrast_long_prob %>%
+  pivot_wider(names_from = type, values_from = value)
+
+# Pivot wide for metrics (probit space)
+contrast_wide_probit <- contrast_long_probit %>%
   pivot_wider(names_from = type, values_from = value)
 
 contrast_plots <- map(PARAMS, function(param){
-  df <- contrast_wide %>% filter(parameter == param)
+  df_prob <- contrast_wide_prob %>% filter(parameter == param)
+  df_probit <- contrast_wide_probit %>% filter(parameter == param)
   true_vals <- true_by_group %>% filter(parameter == param) #unique operator
-
-  # Calculate stats per contrast
-  stats_by_contrast <- df %>%
+  
+  # Calculate stats per contrast IN PROBIT SPACE
+  stats_by_contrast <- df_probit %>%
     group_by(contrast) %>%
     summarise(
       RMSE = sqrt(mean((rec_diff - true_diff)^2)),
@@ -183,28 +207,34 @@ contrast_plots <- map(PARAMS, function(param){
       .groups = "drop"
     )
   
+  # Get plot limits for positioning
+  x_range <- range(df_prob$true_diff)
+  y_range <- range(df_prob$rec_diff)
+  
   # Create stats label with per-contrast metrics
   stats_label <- paste(
     sapply(1:nrow(stats_by_contrast), function(i) {
-      sprintf("%s: RMSE=%.2f, Bias=%.2f",
+      sprintf("%s: RMSE=%.2f Bias=%.2f",
               CONTRAST_NAMES[stats_by_contrast$contrast[i]],
               stats_by_contrast$RMSE[i],
               stats_by_contrast$Bias[i])
     }),
     collapse = "\n"
   )
-
-  #actual plot
-  ggplot(df, aes(x = true_diff, y = rec_diff, color = contrast)) +
+  
+  #actual plot - PLOT IN PROBABILITY SPACE
+  ggplot(df_prob, aes(x = true_diff, y = rec_diff, color = contrast)) +
     geom_point(size = 2, alpha = 0.7, aes(shape = "Recovered")) +
     geom_point(data = data.frame(x = 0, y = 0),aes(x, y, shape = "Zero Point (Comparison Point)"),size = 5,color = "black")+
     geom_abline(slope = 1, intercept = 0, linetype = "dashed", linewidth = 1) +
+    geom_hline(yintercept = 0, linetype = "dotted", color = "gray50", alpha = 0.5) +
+    geom_vline(xintercept = 0, linetype = "dotted", color = "gray50", alpha = 0.5) +
     scale_color_manual(values = CONTRAST_COLORS, labels = CONTRAST_NAMES)+
     scale_shape_manual(name = "Point Type:", values = c("Recovered" = 16, "True Value" = 17, "Zero Point (Comparison Point)" = 8))+ #all the shapes for the points
     labs(
       title = PARAM_LABELS[param],
-      x = "True Difference",
-      y = "Recovered Difference",
+      x = "True Probability Difference",
+      y = "Recovered Probability Difference",
       color = "Contrast:"
     ) +
     geom_point(data = true_vals, aes(x = true_mu, y = true_mu, shape = "True Value"), size = 4, color = "black")+
@@ -212,22 +242,22 @@ contrast_plots <- map(PARAMS, function(param){
     theme(legend.position = "top",
           plot.title = element_text(hjust = 0.5)) +
     annotate(
-      "text", x = min(df$true_diff), y = max(df$rec_diff),
-      label = stats_label,
-      hjust = 0, vjust = 1, size = 3
+      "text", 
+      x = x_range[1],y = y_range[2], label = stats_label, hjust = 0, vjust = 1, size = 3, lineheight = 0.9, fontface = "italic" #some fuckery so it looks ok
     )
 })
 
 #combine with a title
 combined_contrast <- ggarrange(plotlist = contrast_plots, nrow = 1, common.legend = TRUE, legend = "top") %>%
   annotate_figure(
-    top = text_grob("Group Difference Contrasts (Probit-space): Ordering by |Distance| from 0", 
+    top = text_grob("Group Difference Contrasts (Probability Space Display, Probit Metrics):\nOrdering by |Distance| from 0", 
                     face = "bold", size = 14))
 
 #save
 ggsave(file.path(plot_dir, "group_contrast_recovery_prob_ggplot.png"),
        plot = combined_contrast, width = 12, height = 4, dpi = 300, bg = "white")
 ```
+
 
 
 # ---------------------------
@@ -294,3 +324,79 @@ combined_density <- ggarrange(plotlist = density_plots, nrow = 1, common.legend 
 ggsave(file.path(plot_dir, "mu_density_by_group_prob_ggplot.png"),
        plot = combined_density, width = 12, height = 4, dpi = 300, bg = "white")
 ```
+
+# ---------------------------
+# 3.5 TABLE OF METRICS FOR THE DENSITY PLOT
+# ---------------------------
+```{r}
+# Calculate metrics for density plots (in probit space!)
+density_metrics <- map_dfr(PARAMS, function(param) {
+  
+  # Get all posterior samples in probit space
+  posterior_probit <- bind_rows(lapply(1:length(samples_list), function(sim_id) {
+    samp <- samples_list[[sim_id]]
+    param_col <- paste0("mu_", param, "_raw")
+    
+    bind_rows(lapply(1:length(GROUPS), function(group_idx) {
+      tibble(
+        group = GROUPS[group_idx],
+        posterior = samp[[param_col]][, group_idx],
+        sim_id = sim_id
+      )
+    }))
+  }))
+  
+  # Calculate metrics by group in probit space
+  posterior_probit %>%
+    group_by(group) %>%
+    summarise(
+      parameter = param,
+      true_val_probit = true_params[[group[1]]]$mu[[paste0(param, "_raw")]],
+      post_mean_probit = mean(posterior),
+      post_median_probit = median(posterior),
+      post_sd_probit = sd(posterior),
+      ci_lower_probit = quantile(posterior, 0.025),
+      ci_upper_probit = quantile(posterior, 0.975),
+      bias_probit = post_mean_probit - true_val_probit,
+      rmse_probit = sqrt(mean((posterior - true_val_probit)^2)),
+      coverage = true_val_probit >= quantile(posterior, 0.025) & true_val_probit <= quantile(posterior, 0.975),
+      .groups = "drop"
+    ) %>%
+    relocate(parameter, group)
+})
+
+# Format for display
+density_metrics_table <- density_metrics %>%
+  mutate(
+    Parameter = PARAM_LABELS[parameter],
+    Group = group,
+    `True (Probit)` = sprintf("%.3f", true_val_probit),
+    `Mean (Probit)` = sprintf("%.3f", post_mean_probit),
+    `SD (Probit)` = sprintf("%.3f", post_sd_probit),
+    `95% CI (Probit)` = sprintf("[%.3f, %.3f]", ci_lower_probit, ci_upper_probit),
+    RMSE = sprintf("%.3f", rmse_probit),
+    Bias = sprintf("%.3f", bias_probit),
+    `Coverage (95% Credible Interval)` = ifelse(coverage, TRUE, FALSE) #95% credible interval
+  ) %>%
+  select(Parameter, Group, `True (Probit)`, `Mean (Probit)`, `SD (Probit)`, `95% CI (Probit)`, RMSE, Bias, `Coverage (95% Credible Interval)`)
+
+table_grob <- tableGrob(density_metrics_table, rows = NULL, 
+                        theme = ttheme_minimal(
+                          core = list(fg_params = list(hjust = 0, x = 0.1)),
+                          colhead = list(fg_params = list(fontface = "bold"))))
+
+# add and combine with title
+title <- textGrob("Density Plot Metrics (Probit Space)", 
+                  gp = gpar(fontsize = 14, fontface = "bold"))
+
+table_with_title <- arrangeGrob(title, table_grob, 
+                                heights = c(0.1, 0.9), nrow = 2)
+
+# Save as PNG
+ggsave(file.path(plot_dir, "mu_density_metrics_table.png"), 
+       plot = table_with_title, width = 12, height = 4, dpi = 300, bg = "white")
+
+# Save as CSV
+write.csv(density_metrics_table, file.path(plot_dir, "mu_density_metrics.csv"), row.names = FALSE)
+```
+

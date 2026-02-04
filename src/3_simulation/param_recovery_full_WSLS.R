@@ -2,7 +2,7 @@
 # GROUP & INDIV PARAMETER RECOVERY - HIERARCHICAL WSLS (win-stay / lose-stay + epsilon)
 # ============================================================================
 #need to report corr (true vs recovered), bias, slope (they're included, but only at the end right now)
-#a bit of a mess unfortunately (could have done this cleaner, such as by making the plots in a separate file)
+#a bit of a mess unfortunately (could have done this cleaner/less drawn out, such as by making the plots in a separate file)
 
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite)
@@ -16,7 +16,7 @@ file <- file.path(root_path, "src/3_simulation/recovery/simulated_data", filenam
 # Load JSON simulated group data
 data <- jsonlite::fromJSON(file)
 
-#using median not mode!!
+#using median not mode or mean!!
 
 # ---------------------------
 # SETUP
@@ -186,11 +186,11 @@ for (i in 1:n_groups) {
   
   sims <- samples$BUGSoutput$sims.list
   
-  # store true and inferred group means (using median instead of MPD)
+  # store true and inferred group mu medians 
   true_mu[i, ] <- c(mu_prob_stay_win_raw, mu_prob_stay_lose_raw, mu_epsilon_raw)
   infer_mu[i, ] <- sapply(params, function(p) median(sims[[p]]))
   
-  # store true and inferred group lambdas (using median instead of MPD)
+  # store true and inferred group lambda medians
   true_lambda[i, ] <- c(lambda_prob_stay_win, lambda_prob_stay_lose, lambda_epsilon)
   infer_lambda[i, ] <- sapply(lambda_params, function(p) median(sims[[p]]))
   
@@ -224,7 +224,7 @@ for (i in 1:n_groups) {
     nsubs = n_subjects,
     max_rhat = max_rhat,
     min_ess = min_ess,
-    true_mu_prob_stay_win_raw = true_mu[,1],
+    true_mu_prob_stay_win_raw = true_mu[,1], #raw = probit (maybe odd, inconsistent naming here) (don't feel like fixing it at present) (matches the model)
     true_mu_prob_stay_lose_raw = true_mu[,2],
     true_mu_epsilon_raw = true_mu[,3],
     infer_mu_prob_stay_win_raw = infer_mu[,1],
@@ -238,7 +238,6 @@ for (i in 1:n_groups) {
     infer_lambda_epsilon = infer_lambda[,3],
     rhat_vals #rhat vals
   )
-  
   
   write.csv(df_group, csv_file, row.names = FALSE)
   cat(sprintf("Saved group-level results to %s\n", basename(csv_file)))
@@ -277,6 +276,7 @@ for (i in 1:n_groups) {
   n_completed <- sum(completed)
   
   if(n_completed >= 2) {
+    
     # plot mu parameters
     png(plot_mu_file, width = 1800, height = 600, res = 150)
     par(mfrow=c(1,3), mar=c(3,3,2,1))
@@ -362,6 +362,8 @@ df_complete <- df_group[completed,]
 # ---------------------------
 # GROUP-LEVEL RECOVERY METRICS (r, slope, bias, RMSE)
 # ---------------------------
+
+# mu parameters
 for(p in c("prob_stay_win_raw","prob_stay_lose_raw","epsilon_raw")) {
   true_v  <- df_complete[[paste0("true_mu_", p)]]
   infer_v <- df_complete[[paste0("infer_mu_", p)]]
@@ -378,6 +380,7 @@ for(p in c("prob_stay_win_raw","prob_stay_lose_raw","epsilon_raw")) {
   df_group[idx, paste0("mu_", p, "_slope")] <- coef(lm(infer_v ~ true_v))[2]
 }
 
+# lambda parameters
 for(p in c("prob_stay_win","prob_stay_lose","epsilon")) {
   true_v  <- df_complete[[paste0("true_lambda_", p)]]
   infer_v <- df_complete[[paste0("infer_lambda_", p)]]
@@ -430,7 +433,7 @@ if(exists("df_indiv") && nrow(df_indiv) > 0) {
 }
 
 # ---------------------------
-# CONVERGENCE DIAGNOSTICS SUMMARY
+# CONVERGENCE DIAGNOSTICS SUMMARY (EXTRA)
 # ---------------------------
 cat("\n=== CONVERGENCE DIAGNOSTICS ===\n")
 cat(sprintf("Groups with Rhat > 1.1: %d/%d\n", 
@@ -442,9 +445,8 @@ cat(sprintf("Mean min ESS: %.0f (SD=%.0f)\n",
 
 cat("\nDone!\n")
 
-
 # ---------------------------
-# CONVERGENCE DIAGNOSTICS SUMMARY EXTRA (RHAT & PARAMETER EXTREMENESS)
+# CONVERGENCE DIAGNOSTICS SUMMARY (EXTRA) (RHAT & PARAMETER EXTREMENESS)
 # ---------------------------
 df_diag <- df_group
 

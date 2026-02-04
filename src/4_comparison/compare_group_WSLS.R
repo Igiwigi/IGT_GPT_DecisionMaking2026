@@ -40,7 +40,7 @@ hc_data$group <- "ahn_hc"
 old_gpt_data$group <- "gpt_OLD_2023"
 new_gpt_data$group <- "gpt_NEW_2025"
 
-# combine all data into one that can be passed (faceted by grp)
+# combine all data into one that can be passed to jags (model differentiates per group)
 all_data <- rbind(hc_data, old_gpt_data, new_gpt_data)
 
 # Get unique subjects per group
@@ -49,7 +49,7 @@ subjects_per_group <- all_data %>%
   summarise(n_subjects = n_distinct(subjID))
 
 print("Subjects per group:")
-print(subjects_per_group) #new has slightly more
+print(subjects_per_group) #newGPT has slightly more (32); since Bayesian, this is ok
 
 #create the matrix for JAGS
 unique_subjects <- unique(all_data$subjID)
@@ -139,7 +139,7 @@ for(g in 1:length(group_names)){
   
   n_subjects = subjects_per_group$n_subjects[subjects_per_group$group == group_name] #save number of subjects
   
-  # Extract posterior distributions
+  # Extract posterior distributions (probit)
   mu_prob_stay_win_raw <- sims_list$mu_prob_stay_win_raw[, g]
   mu_prob_stay_lose_raw <- sims_list$mu_prob_stay_lose_raw[, g]
   mu_epsilon_raw <- sims_list$mu_epsilon_raw[, g]

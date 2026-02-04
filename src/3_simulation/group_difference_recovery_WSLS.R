@@ -1,10 +1,9 @@
 # ============================================================================
 # GROUP DIFFERENCE RECOVERY - HIERARCHICAL WSLS (3 groups: Human, GPT2023, GPT2025)
-# PART 1: ANALYSIS & SIMULATION
+# Run visualization script separately after this completes!!
 # ============================================================================
 # This script runs the parameter recovery simulation and saves all results (to see group difference recovery!!)
-# Run visualization script separately after this completes!!
-# a bit of a mess unfortunately (could have done this cleaner)
+# a bit of a mess unfortunately (could have done this cleaner/less drawn out)
 
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite, data.table)
@@ -233,26 +232,34 @@ for(sim in 1:n_simulations){
     contrasts <- rbind(contrasts,data.frame(
       sim_id=sim, parameter=param,
       
-      #TRUE DIFFERENCES (all into prob, not probit!!!) (can't do this later since arithmetic!!)
-      true_diff_gpt2023_human=probit_to_prob(true_vals[2])-probit_to_prob(true_vals[1]),
-      true_diff_gpt2025_human=probit_to_prob(true_vals[3])-probit_to_prob(true_vals[1]),
-      true_diff_gpt2025_gpt2023=probit_to_prob(true_vals[3])-probit_to_prob(true_vals[2]),
+      #TRUE DIFFERENCES (all in probit!!!) (can't do the conversion later since arithmetic!!)
+      true_diff_gpt2023_human_probit=true_vals[2]-true_vals[1],
+      true_diff_gpt2025_human_probit=true_vals[3]-true_vals[1],
+      true_diff_gpt2025_gpt2023_probit=true_vals[3]-true_vals[2],
       
-      #RECORDED DIFFERENCES (all into prob!!)
-      rec_diff_gpt2023_human=probit_to_prob(rec_vals[2])-probit_to_prob(rec_vals[1]),
-      rec_diff_gpt2025_human=probit_to_prob(rec_vals[3])-probit_to_prob(rec_vals[1]),
-      rec_diff_gpt2025_gpt2023=probit_to_prob(rec_vals[3])-probit_to_prob(rec_vals[2])
-      #not currently saving these in probit; should be fine
+      #RECORDED DIFFERENCES (all in probit!!)
+      rec_diff_gpt2023_human_probit=rec_vals[2]-rec_vals[1],
+      rec_diff_gpt2025_human_probit=rec_vals[3]-rec_vals[1],
+      rec_diff_gpt2025_gpt2023_probit=rec_vals[3]-rec_vals[2],
       
+      #TRUE DIFFERENCES (in probability space)
+      true_diff_gpt2023_human_prob=probit_to_prob(true_vals[2])-probit_to_prob(true_vals[1]),
+      true_diff_gpt2025_human_prob=probit_to_prob(true_vals[3])-probit_to_prob(true_vals[1]),
+      true_diff_gpt2025_gpt2023_prob=probit_to_prob(true_vals[3])-probit_to_prob(true_vals[2]),
+      
+      #RECORDED DIFFERENCES (in probability space)
+      rec_diff_gpt2023_human_prob=probit_to_prob(rec_vals[2])-probit_to_prob(rec_vals[1]),
+      rec_diff_gpt2025_human_prob=probit_to_prob(rec_vals[3])-probit_to_prob(rec_vals[1]),
+      rec_diff_gpt2025_gpt2023_prob=probit_to_prob(rec_vals[3])-probit_to_prob(rec_vals[2])
     ))
   }
   
   # ---------------------------
   # Save incremental results
   # ---------------------------
-  write.csv(results, file.path(results_dir,"group_params_recovery.csv"), row.names=FALSE)
-  write.csv(contrasts, file.path(results_dir,"group_contrasts_recovery.csv"), row.names=FALSE)
-  write.csv(hyperparams, file.path(results_dir,"group_hyperparams.csv"), row.names=FALSE)
+  write.csv(results, file.path(results_dir,"group_params_recovery.csv"), row.names=FALSE) #contains true/rec mu&lambda and some convergence diagnostics (should report them)
+  write.csv(contrasts, file.path(results_dir,"group_contrasts_recovery.csv"), row.names=FALSE) #contains the contrasts (true and recovered)
+  write.csv(hyperparams, file.path(results_dir,"group_hyperparams.csv"), row.names=FALSE) #contains the hyperparameters that dont change (kinda redundant)
 }
 
 # ---------------------------

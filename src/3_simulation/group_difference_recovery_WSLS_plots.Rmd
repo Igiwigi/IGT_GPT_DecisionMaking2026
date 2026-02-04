@@ -9,7 +9,7 @@
 
 ```{r}
 library(pacman)
-pacman::p_load(tidyverse, ggpubr, grid)
+pacman::p_load(tidyverse, ggpubr, gridExtra)
 ```
 
 ```{r}
@@ -250,7 +250,7 @@ contrast_plots <- map(PARAMS, function(param){
 #combine with a title
 combined_contrast <- ggarrange(plotlist = contrast_plots, nrow = 1, common.legend = TRUE, legend = "top") %>%
   annotate_figure(
-    top = text_grob("Group Difference Contrasts (Probability Space Display, Probit Metrics):\nOrdering by |Distance| from 0", 
+    top = text_grob("Group Difference Contrasts (Probability Space Display, Probit Metrics)\nOrdering by |Distance| from 0", 
                     face = "bold", size = 14))
 
 #save

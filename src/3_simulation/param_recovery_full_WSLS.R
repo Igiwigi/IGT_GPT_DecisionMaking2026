@@ -1,8 +1,13 @@
 # ============================================================================
 # GROUP & INDIV PARAMETER RECOVERY - HIERARCHICAL WSLS (win-stay / lose-stay + epsilon)
+#
+# This script performs parameter recovery for a hierarchical WSLS model using simulated group data stored in JSON format. 
+# It fits the model using JAGS, extracts inferred parameters, and compares them to the true parameters used in the simulations.
 # ============================================================================
-#need to report corr (true vs recovered), bias, slope (they're included, but only at the end right now)
-#a bit of a mess unfortunately (could have done this cleaner/less drawn out, such as by making the plots in a separate file)
+# a bit of a mess unfortunately (could have done this cleaner/less drawn out, such as with less repetition...)
+
+# wondering whether bad convergence runs should be rerun instead of kept in (even with fine overall r)? 
+# --> could be rerun with higher param in JAGS (but then would have to do this before updating plots, or update plots only at the end)
 
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite)
@@ -22,7 +27,7 @@ data <- jsonlite::fromJSON(file)
 # SETUP
 # ---------------------------
 n_groups <- length(data$x)
-n_groups <- 100 # for testing
+#n_groups <- 10 # for testing
 
 start_time <- Sys.time()
 print(paste0("Simulation started: ", start_time))
@@ -33,9 +38,9 @@ print(paste0("Simulation started: ", start_time))
 params <- c("mu_prob_stay_win_raw", "mu_prob_stay_lose_raw", "mu_epsilon_raw")
 lambda_params <- c("lambda_prob_stay_win", "lambda_prob_stay_lose", "lambda_epsilon")
 
+# Group-level parameter storage
 true_mu <- matrix(NA, nrow=n_groups, ncol=length(params))
 infer_mu <- matrix(NA, nrow=n_groups, ncol=length(params))
-
 true_lambda <- matrix(NA, nrow=n_groups, ncol=length(lambda_params))
 infer_lambda <- matrix(NA, nrow=n_groups, ncol=length(lambda_params))
 
@@ -156,28 +161,6 @@ for (i in 1:n_groups) {
   max_rhat[i] <- max(rhat_vec, na.rm = TRUE)
   min_ess[i]  <- min(ess_vec,  na.rm = TRUE)
   
-  #some prints for each run
-  cat("Rhat by parameter and group:\n")
-  group_labels <- c("human", "gpt2023", "gpt2025")
-  
-  for (p in jags_params) {
-    cat(sprintf("  %s:\n", p))
-    
-    for (g in 1:3) {
-      row_name <- paste0(p, "[", g, "]")
-      
-      if (row_name %in% rownames(summary_mat)) {
-        rhat_val <- summary_mat[row_name, "Rhat"]
-        ess_val  <- summary_mat[row_name, "n.eff"]
-        
-        cat(sprintf(
-          "    %-8s  Rhat = %.3f | ESS = %.0f\n",
-          group_labels[g], rhat_val, ess_val
-        ))
-      }
-    }
-  }
-  
   cat("\nConvergence diagnostics:\n")
   print(summary_mat[conv_params, c("Rhat", "n.eff")], digits = 3)
   
@@ -201,7 +184,7 @@ for (i in 1:n_groups) {
   }
   
   if(max_rhat[i] > 1.1) {
-    warning(sprintf("Group %d: Poor convergence (Rhat = %.3f)\n", i, max_rhat[i]))
+    warning(sprintf("Group %d: Poor convergence (Rhat = %.3f)\n", i, max_rhat[i])) #this is fine, recovers ok, also its usually epsilon or lambda (sd) that is bad
   }
   
   # ---------------------------
@@ -236,7 +219,7 @@ for (i in 1:n_groups) {
     infer_lambda_prob_stay_win = infer_lambda[,1],
     infer_lambda_prob_stay_lose = infer_lambda[,2],
     infer_lambda_epsilon = infer_lambda[,3],
-    rhat_vals #rhat vals
+    rhat_vals
   )
   
   write.csv(df_group, csv_file, row.names = FALSE)
@@ -270,11 +253,12 @@ for (i in 1:n_groups) {
   }
   
   # ---------------------------
-  # UPDATE PLOTS
+  # UPDATE PLOTS (done per run!)
   # ---------------------------
   completed <- !is.na(infer_mu[,1])
   n_completed <- sum(completed)
   
+  #can only make plots if 2 or more groups are done
   if(n_completed >= 2) {
     
     # plot mu parameters
@@ -329,11 +313,7 @@ for (i in 1:n_groups) {
                 side=3, line=0.5, adj=0, cex=0.7)
         }
         dev.off()
-      }
-    }
-    
-    cat(sprintf("Updated plots with %d groups\n", n_completed))
-  }
+      }}}
   
   # print progress
   elapsed <- as.numeric(difftime(Sys.time(), start_time, units="mins"))
@@ -420,15 +400,12 @@ if(exists("df_indiv") && nrow(df_indiv) > 0) {
         slope = coef(lm(infer_v ~ true_v))[2],
         bias  = mean(infer_v - true_v, na.rm=TRUE),
         rmse  = sqrt(mean((infer_v - true_v)^2, na.rm=TRUE))
-      )
-    )
-  }
+      ))}
   
   write.csv(
     df_indiv_summary,
     file.path(results_dir, "param_recovery_indiv_summary_WSLS.csv"),
-    row.names = FALSE
-  )
+    row.names = FALSE)
   cat(sprintf("Saved individual-level summary metrics: %s\n", "param_recovery_indiv_summary_WSLS.csv"))
 }
 
@@ -472,7 +449,7 @@ print(aggregate(
 cat("\nProportion of extreme values (p < .05 or > .95):\n")
 extreme_percent <- function(x) {
   mean(x < 0.05 | x > 0.95, na.rm = TRUE) * 100
-}
+} # fairly high, but it seems recovery is still ok?
 
 #amount of extreme variables, in percent (around 8-13%)
 print(aggregate(

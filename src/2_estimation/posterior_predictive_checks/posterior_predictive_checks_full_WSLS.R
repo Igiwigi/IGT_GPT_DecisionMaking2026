@@ -12,7 +12,9 @@ group_name <- groups[3] # which group to do PPC on
 
 # ---- Load data ----
 fitfile <- file.path(root_path, "src", "2_estimation", "results", "simpler_models",
-                     paste0("jags_fit_WSLS_", group_name, ".RData"))
+                     paste0("jags_fit_WSLS_", group_name, ".RData")) 
+
+#This data is stored in GIT LFS ('git lfs install' to fetch them)
 load(fitfile)
 
 data_file <- file.path(root_path, "data", "final_data", paste0("clean_", group_name, ".csv"))

@@ -1,4 +1,4 @@
-Trying WSLS since the new data doesn't converge (and the chains dont mix) for ORL fixed theta. 
+Trying WSLS since the new data doesn't converge (and the chains dont mix) for ORL fixed theta (also the new GPT model isn't learning anyway). 
 Might switch to this if we can justify it in analysis.
 
-Seems to work out fine, though it slightly underestimates Lose-Switch for the new data?
+Seems to work out fine, though it slightly underestimates Lose-Switch for the new data? (but still reasonable)

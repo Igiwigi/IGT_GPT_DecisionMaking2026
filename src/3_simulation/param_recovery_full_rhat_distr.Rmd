@@ -16,7 +16,6 @@ pacman::p_load(tidyverse, ggpubr, gridExtra)
 # ---------------------------
 root_path <- "~/IGT_LLM_DecisionMaking"
 results_dir <- file.path(root_path, "src/3_simulation/recovery/results") 
-plot_dir <- file.path(results_dir, "plots")
 dir.create(plot_dir, showWarnings = FALSE)
 
 #where the rhats are
@@ -60,7 +59,7 @@ p1 <- ggplot(rhat_long, aes(x = parameter, y = rhat)) +
   coord_flip() +
   labs(
     title = "Rhat Distribution by Parameter",
-    subtitle = "Red line = 1.1 (acceptable)", #1.01 is ideal
+    subtitle = "Red line = 1.1 (acceptable), 1.01 (ideal)",
     x = "Parameter",
     y = "Rhat",
     fill = "Parameter Type"
@@ -68,6 +67,9 @@ p1 <- ggplot(rhat_long, aes(x = parameter, y = rhat)) +
   theme_bw() +
   theme(legend.position = "bottom")
 p1
+
+ggsave(file.path(results_dir, "rhat_distribution_by_parameter_WSLS.png"),
+       plot = p1, width = 8, height = 6)
 ```
 
 ```{r}
@@ -96,12 +98,17 @@ rhat_by_type <- rhat_long %>%
   group_by(param_type) %>%
   summarise(
     n_obs = n(),
-    mean_rhat = round(mean(rhat, na.rm = TRUE),2),
-    median_rhat = round(median(rhat, na.rm = TRUE),2),
-    '%bad  (rhat > 1.1)' = round(100 * mean(rhat > 1.1, na.rm = TRUE),1),
-    '%good (rhat < 1.01)' = round(100 * mean(rhat < 1.01, na.rm = TRUE),1),
+    mean_rhat = round(mean(rhat, na.rm = TRUE), 2),
+    median_rhat = round(median(rhat, na.rm = TRUE), 2),
+    '%bad  (rhat > 1.1)'  = paste0(
+      round(100 * mean(rhat > 1.1, na.rm = TRUE), 1), "%"
+    ),
+    '%good (rhat < 1.01)' = paste0(
+      round(100 * mean(rhat < 1.01, na.rm = TRUE), 1), "%"
+    ),
     .groups = "drop"
   )
+
 
 print(rhat_by_type)
 ```

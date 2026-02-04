@@ -2,7 +2,7 @@
 # GROUP DIFFERENCE RECOVERY - HIERARCHICAL WSLS (3 groups: Human, GPT2023, GPT2025)
 # Run visualization script separately after this completes!!
 # ============================================================================
-# This script runs the parameter recovery simulation and saves all results (to see group difference recovery!!)
+# This script runs the parameter recovery simulation and saves all results (to see group difference recovery!!) (mostly interested in mu parameters)
 # a bit of a mess unfortunately (could have done this cleaner/less drawn out)
 
 library(pacman)
@@ -153,10 +153,14 @@ for(sim in 1:n_simulations){
   cat("Running JAGS...\n")
   sim_start <- Sys.time()
   samples <- jags.parallel(
-    data=jags_data, inits=NULL, parameters.to.save=jags_params,
-    model.file=model_file,
-    n.chains=3, n.iter=5000, n.burnin=1000, n.thin=1, n.cluster=3,
-    jags.seed=1234
+    data = jags_data, inits = NULL, parameters.to.save = jags_params,
+    model.file = model_file,
+    n.chains = 3, 
+    n.iter = 10000, #i upped all this to have slightly better convergence overall
+    n.burnin = 2000,
+    n.thin = 2, #to remove autocorrelation when high n.iter, supposedly
+    n.cluster = 4,
+    jags.seed= 1234
   )
   cat(sprintf("Completed in %.2f minutes\n", as.numeric(difftime(Sys.time(), sim_start, units="mins"))))
   

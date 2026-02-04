@@ -10,7 +10,7 @@ set.seed(1234)
 groups <- c("ahn_hc", "gpt_OLD_2023", "gpt_NEW_2025")
 
 ### SECTION WHERE YOU CAN CHANGE THINGS ###
-WSLS <- TRUE # if TRUE runs WSLS, if FALSE runs Softmax
+WSLS <- TRUE # if TRUE runs WSLS, if FALSE runs Softmax (SOFTMAX is not used, just tested)
 model_tag <- ifelse(WSLS, "WSLS", "Softmax")
 
 # new root path (name the code folder this)
@@ -78,16 +78,16 @@ print("Initializing JAGS ...")
 print(paste("Running model:", model_tag, "| Group:", group_name))
 
 samples <- jags.parallel(
-  jags_data,
+  data = jags_data,
   inits = NULL,
-  params,
+  parameters.to.save = jags_params,
   model.file = model_file,
   n.chains = 3,
-  n.iter = 5000,
-  n.burnin = 1000,
-  n.thin = 1,
+  n.iter = 10000, #i upped all this to have slightly better convergence overall (will also be reflected in all plots after this)
+  n.burnin = 2000,
+  n.thin = 2, #to remove autocorrelation when high n.iter, supposedly
   n.cluster = 4,
-  jags.seed = 1234
+  jags.seed= 1234
 )
 
 end_time <- Sys.time()

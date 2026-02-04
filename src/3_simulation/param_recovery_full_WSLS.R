@@ -6,8 +6,8 @@
 # ============================================================================
 # a bit of a mess unfortunately (could have done this cleaner/less drawn out, such as with less repetition...)
 
-# wondering whether bad convergence runs should be rerun instead of kept in (even with fine overall r)? 
-# --> could be rerun with higher param in JAGS (but then would have to do this before updating plots, or update plots only at the end)
+# wondering whether bad convergence runs should be rerun instead of kept in (even with fine overall r)? (about 8-13% of vars are extreme overall) 
+# --> fix: increasing the jags n.iter and such to account for this (also in later plots/analysis)
 
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite)
@@ -143,9 +143,9 @@ for (i in 1:n_groups) {
     parameters.to.save = jags_params,
     model.file = model_file,
     n.chains = 3,
-    n.iter = 5000,
-    n.burnin = 1000,
-    n.thin = 1,
+    n.iter = 10000, #i upped all this to have slightly better convergence overall (will also be reflected in all plots after this)
+    n.burnin = 2000,
+    n.thin = 2, #to remove autocorrelation when high n.iter, supposedly
     n.cluster = 4,
     jags.seed= 1234
   )
@@ -414,7 +414,7 @@ if(exists("df_indiv") && nrow(df_indiv) > 0) {
 # ---------------------------
 cat("\n=== CONVERGENCE DIAGNOSTICS ===\n")
 cat(sprintf("Groups with Rhat > 1.1: %d/%d\n", 
-            sum(max_rhat > 1.1, na.rm = TRUE), sum(!is.na(max_rhat)))) #63 have bad rhat, but the plots and vars are good, so fine?
+            sum(max_rhat > 1.1, na.rm = TRUE), sum(!is.na(max_rhat)))) #THIS IS JUST ONE BAD RHAT PER ALL THE PARAMS for x out y groups
 cat(sprintf("Mean max Rhat: %.3f (SD=%.3f)\n", 
             mean(max_rhat, na.rm = TRUE), sd(max_rhat, na.rm = TRUE)))
 cat(sprintf("Mean min ESS: %.0f (SD=%.0f)\n",
@@ -434,6 +434,7 @@ df_diag$true_epsilon_prob  <- pnorm(df_diag$true_mu_epsilon_raw)
 
 # Flag problematic convergence
 df_diag$bad_rhat <- df_diag$max_rhat > 1.1
+table(df_diag$bad_rhat, useNA = "ifany")
 
 # Summaries
 cat("\nMean transformed parameters by Rhat group:\n")

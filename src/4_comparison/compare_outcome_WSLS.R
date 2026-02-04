@@ -93,16 +93,16 @@ cat("Analysis started:", format(Sys.time()), "\n\n")
 
 start_time <- Sys.time()
 samples <- jags.parallel(
-  data = jags_data, 
-  inits = NULL, 
+  data = jags_data,
+  inits = NULL,
   parameters.to.save = jags_params,
   model.file = model_file,
-  n.chains = 3, 
-  n.iter = 5000, 
-  n.burnin = 1000, 
-  n.thin = 1, 
-  n.cluster = 3,
-  jags.seed = 1234
+  n.chains = 3,
+  n.iter = 10000, #i upped all this to have slightly better convergence overall (will also be reflected in all plots after this)
+  n.burnin = 2000,
+  n.thin = 2, #to remove autocorrelation when high n.iter, supposedly
+  n.cluster = 4,
+  jags.seed= 1234
 )
 end_time <- Sys.time()
 cat(sprintf("\nCompleted in %.2f minutes\n", as.numeric(difftime(end_time, start_time, units="mins"))))

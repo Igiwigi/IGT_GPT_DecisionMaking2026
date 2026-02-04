@@ -1,0 +1,108 @@
+# ============================================================================
+# RHAT VISUALIZATION FOR PARAM RECOVERY FULL
+# ============================================================================
+# just checking the distribution of rhats for all parameters in the param
+# recovery "full" simulation
+# ============================================================================
+
+```{r}
+library(pacman)
+pacman::p_load(tidyverse, ggpubr, gridExtra)
+```
+
+```{r}
+# ---------------------------
+# PATHS
+# ---------------------------
+root_path <- "~/IGT_LLM_DecisionMaking"
+results_dir <- file.path(root_path, "src/3_simulation/recovery/results") 
+plot_dir <- file.path(results_dir, "plots")
+dir.create(plot_dir, showWarnings = FALSE)
+
+#where the rhats are
+param_file <- file.path(results_dir, "param_recovery_group_WSLS_incremental.csv")
+df <- read.csv(param_file)
+```
+
+```{r}
+# ---------------------------
+# PREPARING DF
+# ---------------------------
+# Extract Rhat columns
+rhat_cols <- grep("^Rhat_", names(df), value = TRUE)
+rhat_data <- df[, c("group_id", "max_rhat", rhat_cols)]
+
+# Reshape to long format
+rhat_long <- rhat_data %>%
+  pivot_longer(
+    cols = starts_with("Rhat_"),
+    names_to = "parameter",
+    values_to = "rhat"
+  ) %>%
+  mutate(
+    parameter = gsub("Rhat_", "", parameter),
+    param_type = case_when(
+      grepl("^mu_", parameter) ~ "Group Mean (μ)",
+      grepl("^lambda_", parameter) ~ "Group SD (λ)",
+      TRUE ~ "Other"
+    ),
+    converged = rhat < 1.1
+  )
+```
+
+```{r}
+# ---------------------------
+# PLOT 1: RHAT DISTRIBUTION BY PARAMETER
+# ---------------------------
+p1 <- ggplot(rhat_long, aes(x = parameter, y = rhat)) +
+  geom_boxplot(aes(fill = param_type)) +
+  geom_hline(yintercept = 1.1, linetype = "dashed", color = "red", linewidth = 1) +
+  coord_flip() +
+  labs(
+    title = "Rhat Distribution by Parameter",
+    subtitle = "Red line = 1.1 (acceptable)", #1.01 is ideal
+    x = "Parameter",
+    y = "Rhat",
+    fill = "Parameter Type"
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+p1
+```
+
+```{r}
+cat("\n=== RHAT SUMMARY BY PARAMETER ===\n")
+rhat_by_param <- rhat_long %>%
+  group_by(parameter, param_type) %>%
+  summarise(
+    n_groups = n(),
+    mean_rhat = round(mean(rhat, na.rm = TRUE),2),
+    median_rhat = round(median(rhat, na.rm = TRUE),2),
+    sd_rhat = round(sd(rhat, na.rm = TRUE),2),
+    min_rhat = round(min(rhat, na.rm = TRUE), 2),
+    max_rhat = round(max(rhat, na.rm = TRUE), 2),
+    'n_bad (rhat > 1.1)'= sum(rhat > 1.1, na.rm = TRUE),
+    'n_good (rhat < 1.01)' = sum(rhat < 1.01, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(max_rhat))
+
+print(rhat_by_param, n = Inf)
+```
+
+```{r}
+cat("\n=== RHAT SUMMARY BY PARAMETER TYPE ===\n")
+rhat_by_type <- rhat_long %>%
+  group_by(param_type) %>%
+  summarise(
+    n_obs = n(),
+    mean_rhat = round(mean(rhat, na.rm = TRUE),2),
+    median_rhat = round(median(rhat, na.rm = TRUE),2),
+    '%bad  (rhat > 1.1)' = round(100 * mean(rhat > 1.1, na.rm = TRUE),1),
+    '%good (rhat < 1.01)' = round(100 * mean(rhat < 1.01, na.rm = TRUE),1),
+    .groups = "drop"
+  )
+
+print(rhat_by_type)
+```
+

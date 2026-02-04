@@ -5,18 +5,19 @@ model {
   
   # prob_stay_win: probability of staying after a win
   mu_prob_stay_win_raw ~ dnorm(0, 1)
-  lambda_prob_stay_win ~ dgamma(0.01, 0.01)
+  lambda_prob_stay_win ~ dgamma(1, 0.5) #made slightly more informative (less to explore)
   mu_prob_stay_win <- phi(mu_prob_stay_win_raw)
   
   # prob_stay_lose: probability of staying after a loss
   mu_prob_stay_lose_raw ~ dnorm(0, 1)
-  lambda_prob_stay_lose ~ dgamma(0.01, 0.01)
+  lambda_prob_stay_lose ~ dgamma(1, 0.5) #made slightly more informative (less to explore)
   mu_prob_stay_lose <- phi(mu_prob_stay_lose_raw)
   
-  # epsilon: random exploration parameter
-  mu_epsilon_raw ~ dnorm(0, 1)
-  lambda_epsilon ~ dgamma(0.01, 0.01)
+  # epsilon: random exploration parameter (trying to account for both low and high exploration)
+  mu_epsilon_raw ~ dnorm(-1, 0.5)        
+  lambda_epsilon ~ dgamma(2, 1)  
   mu_epsilon <- phi(mu_epsilon_raw)
+
   
   # Loop through subjects
   for (s in 1:nsubs) {

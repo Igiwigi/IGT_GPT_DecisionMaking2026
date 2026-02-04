@@ -116,16 +116,29 @@ sim_df_long$parameter <- factor(sim_df_long$parameter,
                                 levels = c("prob_stay_win", "prob_stay_lose", "epsilon"),
                                 labels = c("P(Stay|Win)", "P(Stay|Lose)", "Exploration (ε)"))
 
-plot_all <- ggplot(sim_df_long, aes(x=value, color=group)) +
-  geom_density(size=1) +
-  facet_wrap(~parameter, scales="free") +
-  theme_bw() +
-  labs(title="Parameter posterior predictive distributions across groups (WSLS MODEL)",
-       x="Parameter value", 
-       y="Density") +
-  scale_color_manual(values=c("ahn_hc"="black", "gpt_OLD_2023"="blue", "gpt_NEW_2025"="red")) +
-  theme(text=element_text(size=14), 
-        legend.title=element_blank())
+plot_all <- ggplot(sim_df_long, aes(x = value, fill = group, color = group)) +
+  geom_density(alpha = 0.3, size = 1) +   # semi-transparent fills
+  facet_wrap(~parameter, scales = "free", nrow = 1) +
+  theme_bw(base_size = 14) +              # base_size controls overall text
+  labs(
+    title = "Posterior Predictive Distributions of WSLS Parameters",
+    x = "Parameter Value",
+    y = "Density"
+  ) +
+  scale_fill_manual(
+    values = c("ahn_hc" = "black", "gpt_OLD_2023" = "blue", "gpt_NEW_2025" = "red")
+  ) +
+  scale_color_manual(
+    values = c("ahn_hc" = "black", "gpt_OLD_2023" = "blue", "gpt_NEW_2025" = "red")
+  ) +
+  theme(
+    legend.title = element_blank(),
+    legend.position = "top",
+    strip.background = element_rect(fill = "lightgrey", color = "black"),
+    strip.text = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12)
+  )
 
 plot_file <- file.path(root_path, "src", "2_estimation",
                        "posterior_predictive_checks", "parameter_level", 
@@ -161,7 +174,7 @@ sd_plot <- ggplot(sd_table_all, aes(x=parameter, y=mean_SD, fill=group)) +
   labs(title="Subject-level SDs for WSLS parameters",
        x="Parameter", 
        y="Mean SD ± SD of SDs") +
-  theme(text=element_text(size=14), 
+  theme(text=element_text(size=14), #deprecated but refuses to work with linewidth
         legend.title=element_blank())
 
 plot_file_sd <- file.path(root_path, "src", "2_estimation",

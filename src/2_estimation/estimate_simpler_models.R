@@ -1,5 +1,5 @@
 # Simple Models Estimation Script (WSLS & Softmax)
-# Adapted for Win-Stay-Lose-Switch and Softmax models
+# Adapted for Win-Stay-Lose-Switch and Softmax models (WSLS is used in the paper)
 
 pacman::p_load(R2jags, parallel)
 
@@ -17,7 +17,7 @@ model_tag <- ifelse(WSLS, "WSLS", "Softmax")
 root_path <- "~/IGT_LLM_DecisionMaking"
 
 # select group and read in data 
-group_name = groups[2] # grp1: human, grp2: gpt_old, grp3: gpt_new
+group_name = groups[3] # grp1: human, grp2: gpt_old, grp3: gpt_new
 
 ### CODE ###
 
@@ -80,12 +80,12 @@ print(paste("Running model:", model_tag, "| Group:", group_name))
 samples <- jags.parallel(
   data = jags_data,
   inits = NULL,
-  parameters.to.save = jags_params,
+  parameters.to.save = params,
   model.file = model_file,
   n.chains = 3,
   n.iter = 10000, #i upped all this to have slightly better convergence overall (will also be reflected in all plots after this)
   n.burnin = 2000,
-  n.thin = 2, #to remove autocorrelation when high n.iter, supposedly
+  n.thin = 1,
   n.cluster = 4,
   jags.seed= 1234
 )
@@ -131,7 +131,7 @@ if (WSLS) {
 
 # traceplots (group-level only)
 plotfile <- file.path(
-  root_path, "src", "2_estimation", "plots", "simpler_models",
+  root_path, "src", "2_estimation", "convergence_plots", "simpler_models",
   paste0("trace_", model_tag, "_", group_name, ".png")
 )
 

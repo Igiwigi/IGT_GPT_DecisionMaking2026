@@ -120,14 +120,14 @@ def generate_group_data_winlose(payoff_array, n_iterations=20, n_subs=48, save_p
     results = []
 
     for _ in tqdm(range(n_iterations)):
-        # Sample group-level hyperpriors for this iteration
+        # Sample group-level hyperpriors for this iteration (mu and lambda)
         mu_prob_stay_win_raw = np.random.normal(0, 1)
         mu_prob_stay_lose_raw = np.random.normal(0, 1)
-        mu_epsilon_raw = np.random.normal(0, 1)
-
-        lambda_prob_stay_win = np.random.uniform(0.01, 2)
-        lambda_prob_stay_lose = np.random.uniform(0.01, 2)
-        lambda_epsilon = np.random.uniform(0.01, 2)
+        mu_epsilon_raw = np.random.normal(-1, 0.5)  
+        
+        lambda_prob_stay_win = np.random.gamma(shape=1, scale=2)  # Gamma(1,0.5) in Jags
+        lambda_prob_stay_lose = np.random.gamma(shape=1, scale=2) # Gamma(1,0.5) in Jags
+        lambda_epsilon = np.random.gamma(shape=2, scale=1)         # Gamma(2,1) in Jags
 
         x = np.zeros((n_subs, 100), dtype=int)
         X = np.zeros((n_subs, 100))
@@ -299,7 +299,7 @@ def main():
     np.random.seed(1234)
 
     path = pathlib.Path(__file__)
-    payoff_path = path.parents[3] / "utils" / "payoff_scheme_3.csv"
+    payoff_path = path.parents[2] / "utils" / "payoff_scheme_3.csv"
     output_dir = path.parents[3] / "src" / "3_simulation" / "recovery" / "simulated_data"
     output_dir.mkdir(exist_ok=True, parents=True)
 

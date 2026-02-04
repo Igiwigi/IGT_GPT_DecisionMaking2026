@@ -113,7 +113,7 @@ mu_omega_f <- Y$mu_omega_f
 mu_omega_p <- Y$mu_omega_p
 
 # plot traceplots
-plotfile <- file.path(root_path, "src", "2_estimation", "plots", "old_model", paste0("trace_", group_name, ".png"))
+plotfile <- file.path(root_path, "src", "2_estimation", "convergence_plots", "old_model", paste0("trace_", group_name, ".png"))
 png(plotfile, width = 2500, height = 2500, res = 400)
 traceplot(samples$BUGSoutput, ask=FALSE, mfrow = c(3, 2), varname=params)
 dev.off()

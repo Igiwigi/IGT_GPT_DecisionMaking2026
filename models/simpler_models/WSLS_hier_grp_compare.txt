@@ -15,10 +15,11 @@ model {
     lambda_prob_stay_lose[g] ~ dgamma(1, 0.5)
     mu_prob_stay_lose[g] <- phi(mu_prob_stay_lose_raw[g])
     
-    # epsilon: random exploration parameter
-    mu_epsilon_raw[g] ~ dnorm(0, 1)
-    lambda_epsilon[g] ~ dgamma(1, 0.5)
-    mu_epsilon[g] <- phi(mu_epsilon_raw[g])
+    # epsilon: random exploration parameter  (trying to account for both low and high exploration)
+	mu_epsilon_raw[g] ~ dnorm(-1, 0.5)
+	lambda_epsilon[g] ~ dgamma(2, 1)  #group-specific precision!!
+	mu_epsilon[g] <- phi(mu_epsilon_raw[g])
+
   }
   
   # Loop through subjects

@@ -11,8 +11,6 @@ set.seed(1234)
 
 probit_to_prob <- function(x) pnorm(x) #to change probit to probability
 
-#Our (weakly) informed prior for epsilon favors low exploration, resulting in convservative estimates (downward-biased) (but has proper coverage so its ok?)
-
 # ---------------------------
 # PATHS
 # ---------------------------

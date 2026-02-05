@@ -16,7 +16,6 @@ pacman::p_load(tidyverse, ggpubr, gridExtra)
 # ---------------------------
 root_path <- "~/IGT_LLM_DecisionMaking"
 results_dir <- file.path(root_path, "src/3_simulation/recovery/results") 
-dir.create(plot_dir, showWarnings = FALSE)
 
 #where the rhats are
 param_file <- file.path(results_dir, "param_recovery_group_WSLS_incremental.csv")

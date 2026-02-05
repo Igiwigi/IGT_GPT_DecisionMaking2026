@@ -14,7 +14,7 @@ model {
   mu_prob_stay_lose <- phi(mu_prob_stay_lose_raw)
   
   # epsilon: random exploration parameter (trying to account for both low and high exploration)
-  mu_epsilon_raw ~ dnorm(-1, 0.5)        
+  mu_epsilon_raw ~ dnorm(0, 1)        
   lambda_epsilon ~ dgamma(2, 1)  
   mu_epsilon <- phi(mu_epsilon_raw)
 

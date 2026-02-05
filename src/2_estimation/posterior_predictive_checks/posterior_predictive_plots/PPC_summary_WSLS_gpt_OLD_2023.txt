@@ -9,9 +9,9 @@ IF p value is <0.05 or >0.95, there is a significant mismatch between model and 
 
 SWITCHES:
   Observed total: 1596
-  Predicted mean: 1593.0 [1536.0, 1650.0]
-  Bayesian p-value: 0.466
+  Predicted mean: 1592.4 [1534.0, 1650.0]
+  Bayesian p-value: 0.458
 
 WIN-STAY / LOSE-SWITCH:
-  Win-Stay:    Obs=0.502, Pred=0.504 [0.482, 0.526], p=0.557
-  Lose-Switch: Obs=0.678, Pred=0.680 [0.635, 0.724], p=0.546
+  Win-Stay:    Obs=0.502, Pred=0.504 [0.482, 0.526], p=0.560
+  Lose-Switch: Obs=0.678, Pred=0.679 [0.634, 0.723], p=0.526

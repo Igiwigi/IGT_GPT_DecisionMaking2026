@@ -6,9 +6,6 @@
 # ============================================================================
 # a bit of a mess unfortunately (could have done this cleaner/less drawn out, such as with less repetition...)
 
-# wondering whether bad convergence runs should be rerun instead of kept in (even with fine overall r)? (about 8-13% of vars are extreme overall) 
-# --> fix: increasing the jags n.iter and such to account for this (also in later plots/analysis)
-
 library(pacman)
 pacman::p_load(extraDistr, R2jags, parallel, jsonlite)
 

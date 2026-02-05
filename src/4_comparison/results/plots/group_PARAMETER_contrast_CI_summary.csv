@@ -1,0 +1,10 @@
+parameter,comparison,median,q025,q975
+P(stay|win),GPT-2023 vs Human,0.32,-0.1,0.66
+P(stay|win),GPT-2025 vs Human,0.62,0.45,0.75
+P(stay|win),GPT-2025 vs GPT-2023,0.3,-0.02,0.7
+P(stay|lose),GPT-2023 vs Human,0.17,-0,0.35
+P(stay|lose),GPT-2025 vs Human,0.03,-0.1,0.12
+P(stay|lose),GPT-2025 vs GPT-2023,-0.15,-0.31,-0.01
+Epsilon,GPT-2023 vs Human,-0.04,-0.34,0.21
+Epsilon,GPT-2025 vs Human,-0.2,-0.47,-0.01
+Epsilon,GPT-2025 vs GPT-2023,-0.16,-0.31,-0.03

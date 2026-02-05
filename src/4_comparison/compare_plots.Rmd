@@ -3,14 +3,15 @@
 # ============================================================================
 # This script loads the saved results from the 2 fittings (fit hier WSLS model & fit simple outcome model) & makes plots
 # Namely: plots for WSLS parameters & contrasts, and plots for outcome difference & contrast
-# Also: density plots for both using posterior samples
+# Also: density plots for both using posterior samples & some cvs including reportable data
 # ============================================================================
+#a bit of a mess
 
 ```{r setup, include=FALSE}
 library(pacman)
 pacman::p_load(tidyverse, ggpubr)
 
-probit_to_prob <- function(x) pnorm(x) #convert from probit to probability scale
+probit_to_prob <- function(x) pnorm(x) #convert from probit to probability scale (for density plots)
 ```
 
 # ---------------------------
@@ -195,7 +196,7 @@ ggsave(
 )
 
 ```
-```{r RHAT & NEFF}
+```{r RHAT & NEFF summary}
 #quick summary of the Rhat and n_eff values for the group-level parameters (for reporting in the paper)
 rhat_neff_summary <- estimates %>%
   select(group, starts_with("rhat_"), starts_with("n_eff_")) %>%
@@ -206,7 +207,26 @@ rhat_neff_summary <- estimates %>%
                         "gpt_NEW_2025" = "gpt2025"))
 
 #save as csv
-write_csv(rhat_neff_summary, file.path(plot_dir, "group_parameter_convergence_summary.csv"))
+write_csv(rhat_neff_summary, file.path(plot_dir, "group_PARAMETER_convergence_summary.csv"))
+```
+
+
+```{r CI summary}
+#summary of the credible intervals for the group-level parameters (for reporting in the paper)
+CI_summary <- plot_estimates %>%
+  select(group, parameter, median, q025, q975) %>%
+  mutate(across(c(median, q025, q975), ~ round(.x, 2))) %>%
+  arrange(parameter, group)
+
+write_csv(CI_summary, file.path(plot_dir, "group_PARAMETER_CI_summary.csv"))
+
+#summary of the credible intervals for the contrasts (for reporting in the paper)
+CI_summary <- plot_contrasts %>%
+  select(parameter, comparison, median, q025, q975) %>%
+  mutate(across(c(median, q025, q975), ~ round(.x, 2))) %>%
+  arrange(parameter, comparison)
+
+write_csv(CI_summary, file.path(plot_dir, "group_PARAMETER_contrast_CI_summary.csv"))
 ```
 
 # ============================================================================
@@ -308,7 +328,7 @@ ggplot(outcome_contrast_plot, aes(x = median, y = contrast, color = contrast)) +
 
 ggsave(filename = file.path(plot_dir, "outcome_contrasts_plot.png"),width = 6,height = 4,dpi = 300)
 ```
-```{r}
+```{r RHAT & NEFF}
 #quick summary of the Rhat and n_eff values for the group-level parameters (for reporting in the paper)
 rhat_neff_summary_outcome <- outcome_estimate %>%
   select(group, starts_with("rhat_"), starts_with("n_eff_")) %>%
@@ -319,7 +339,25 @@ rhat_neff_summary_outcome <- outcome_estimate %>%
                         "gpt_NEW_2025" = "gpt2025"))
 
 #save as csv
-write_csv(rhat_neff_summary_outcome, file.path(plot_dir, "group_outcome_convergence_summary.csv"))
+write_csv(rhat_neff_summary_outcome, file.path(plot_dir, "group_OUTCOME_convergence_summary.csv"))
+```
+
+```{r CI}
+#credible interval for the outcome param (for each grp separately)
+CI_summary <- plot_estimates_outcome %>%
+  select(group, parameter, median, q025, q975) %>%
+  mutate(across(c(median, q025, q975), ~ round(.x, 2))) %>%
+  arrange(parameter, group)
+
+write_csv(CI_summary, file.path(plot_dir, "group_OUTCOME_CI_summary.csv"))
+
+#credible interval for the outcome contrasts 
+CI_summary <- outcome_contrast_plot %>%
+  select(contrast, median, q025, q975) %>%
+  mutate(across(c(median, q025, q975), ~ round(.x, 2))) %>%
+  arrange(contrast)
+
+write_csv(CI_summary, file.path(plot_dir, "group_OUTCOME_contrast_CI_summary.csv"))
 ```
 
 

@@ -1,0 +1,4 @@
+group,parameter,median,q025,q975
+Human Controls,P(win),0.79,0.76,0.82
+GPT-2023,P(win),0.79,0.75,0.82
+GPT-2025,P(win),0.85,0.83,0.87

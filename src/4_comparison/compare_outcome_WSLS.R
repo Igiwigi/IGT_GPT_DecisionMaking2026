@@ -100,7 +100,7 @@ samples <- jags.parallel(
   n.chains = 3,
   n.iter = 10000, #i upped all this to have slightly better convergence overall (will also be reflected in all plots after this)
   n.burnin = 2000,
-  n.thin = 1, #to remove autocorrelation when high n.iter, supposedly
+  n.thin = 1,
   n.cluster = 4,
   jags.seed= 1234
 )

@@ -9,7 +9,7 @@
 
 ```{r}
 library(pacman)
-pacman::p_load(tidyverse, ggpubr, gridExtra)
+pacman::p_load(tidyverse, ggpubr, gridExtra, grid)
 ```
 
 ```{r}
@@ -330,36 +330,56 @@ ggsave(file.path(plot_dir, "mu_density_by_group_prob_ggplot.png"),
 # ---------------------------
 ```{r}
 # Calculate metrics for density plots (in probit space!)
+# This mirrors the approach in sections 1 & 2: calculate per-sim, then aggregate
 density_metrics <- map_dfr(PARAMS, function(param) {
   
-  # Get all posterior samples in probit space
-  posterior_probit <- bind_rows(lapply(1:length(samples_list), function(sim_id) {
+  # Get the true value for each group (same structure as used in density plot section 3)
+  true_vals <- tibble(
+    group = GROUPS,
+    true_val = sapply(1:length(GROUPS), function(i) {
+      g <- GROUPS[i]
+      param_name <- paste0(param, "_raw")
+      true_params[[g]]$mu[[param_name]]
+    })
+  )
+  
+  # Calculate metrics per simulation per group
+  sim_summaries <- map_dfr(1:length(samples_list), function(sim_id) {
     samp <- samples_list[[sim_id]]
     param_col <- paste0("mu_", param, "_raw")
     
-    bind_rows(lapply(1:length(GROUPS), function(group_idx) {
+    map_dfr(1:length(GROUPS), function(group_idx) {
+      group <- GROUPS[group_idx]
+      true_val <- true_vals$true_val[true_vals$group == group]
+      post_samples <- samp[[param_col]][, group_idx]
+      
       tibble(
-        group = GROUPS[group_idx],
-        posterior = samp[[param_col]][, group_idx],
-        sim_id = sim_id
+        group = group,
+        sim_id = sim_id,
+        true_val = true_val,
+        post_mean = mean(post_samples),
+        post_median = median(post_samples),
+        post_sd = sd(post_samples),
+        ci_lower = quantile(post_samples, 0.025),
+        ci_upper = quantile(post_samples, 0.975),
+        coverage = true_val >= ci_lower & true_val <= ci_upper
       )
-    }))
-  }))
+    })
+  })
   
-  # Calculate metrics by group in probit space
-  posterior_probit %>%
+  # Aggregate across simulations to get recovery performance
+  sim_summaries %>%
     group_by(group) %>%
     summarise(
       parameter = param,
-      true_val_probit = true_params[[group[1]]]$mu[[paste0(param, "_raw")]],
-      post_mean_probit = mean(posterior),
-      post_median_probit = median(posterior),
-      post_sd_probit = sd(posterior),
-      ci_lower_probit = quantile(posterior, 0.025),
-      ci_upper_probit = quantile(posterior, 0.975),
-      bias_probit = post_mean_probit - true_val_probit,
-      rmse_probit = sqrt(mean((posterior - true_val_probit)^2)),
-      coverage = true_val_probit >= quantile(posterior, 0.025) & true_val_probit <= quantile(posterior, 0.975),
+      true_val_probit = unique(true_val),
+      mean_post_mean = mean(post_mean),
+      mean_post_sd = mean(post_sd),
+      mean_ci_lower = mean(ci_lower),
+      mean_ci_upper = mean(ci_upper),
+      RMSE = sqrt(mean((post_mean - true_val)^2)),
+      Bias = mean(post_mean - true_val),
+      Coverage = mean(coverage),  # Proportion of sims where 95% CI contained true value
       .groups = "drop"
     ) %>%
     relocate(parameter, group)
@@ -371,23 +391,27 @@ density_metrics_table <- density_metrics %>%
     Parameter = PARAM_LABELS[parameter],
     Group = group,
     `True (Probit)` = sprintf("%.3f", true_val_probit),
-    `Mean (Probit)` = sprintf("%.3f", post_mean_probit),
-    `SD (Probit)` = sprintf("%.3f", post_sd_probit),
-    `95% CI (Probit)` = sprintf("[%.3f, %.3f]", ci_lower_probit, ci_upper_probit),
-    RMSE = sprintf("%.3f", rmse_probit),
-    Bias = sprintf("%.3f", bias_probit),
-    `Coverage (95% Credible Interval)` = ifelse(coverage, TRUE, FALSE) #95% credible interval
+    `Mean (Probit)` = sprintf("%.3f", mean_post_mean),
+    `SD (Probit)` = sprintf("%.3f", mean_post_sd),
+    `95% CI (Probit)` = sprintf("[%.3f, %.3f]", mean_ci_lower, mean_ci_upper),
+    RMSE = sprintf("%.3f", RMSE),
+    Bias = sprintf("%.3f", Bias),
+    `Coverage (95% Credible Interval)` = ifelse(Coverage == 1, "TRUE", 
+                                                 ifelse(Coverage == 0, "FALSE",
+                                                        sprintf("%.0f%%", Coverage * 100)))
   ) %>%
-  select(Parameter, Group, `True (Probit)`, `Mean (Probit)`, `SD (Probit)`, `95% CI (Probit)`, RMSE, Bias, `Coverage (95% Credible Interval)`)
+  select(Parameter, Group, `True (Probit)`, `Mean (Probit)`, `SD (Probit)`, 
+         `95% CI (Probit)`, RMSE, Bias, `Coverage (95% Credible Interval)`)
 
+# Create table grob
 table_grob <- tableGrob(density_metrics_table, rows = NULL, 
                         theme = ttheme_minimal(
                           core = list(fg_params = list(hjust = 0, x = 0.1)),
                           colhead = list(fg_params = list(fontface = "bold"))))
 
-# add and combine with title
-title <- textGrob("Density Plot Metrics (Probit Space)", 
-                  gp = gpar(fontsize = 14, fontface = "bold"))
+# Add title
+title <- grid::textGrob("Density Plot Metrics (Probit Space)", 
+                        gp = grid::gpar(fontsize = 14, fontface = "bold"))
 
 table_with_title <- arrangeGrob(title, table_grob, 
                                 heights = c(0.1, 0.9), nrow = 2)
@@ -397,6 +421,8 @@ ggsave(file.path(plot_dir, "mu_density_metrics_table.png"),
        plot = table_with_title, width = 12, height = 4, dpi = 300, bg = "white")
 
 # Save as CSV
-write.csv(density_metrics_table, file.path(plot_dir, "mu_density_metrics.csv"), row.names = FALSE)
+write.csv(density_metrics_table, file.path(plot_dir, "mu_density_metrics.csv"), 
+          row.names = FALSE)
 ```
+
 

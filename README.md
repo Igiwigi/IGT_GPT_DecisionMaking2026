@@ -1,8 +1,10 @@
 ## Overview:
 
 This project investigates decision-making processes by comparing human performance on the Iowa Gambling Task (IGT) to that of AI agents (namely, ChatGPT models) using Bayesian methods.
+
 Human data from Ahn et al. (2014) is compared with ChatGPT IGT data from 2023 (GPT 3.5-turbo-1106) and ChatGPT IGT data from 2026 (GPT 4.1).
 The primary model used for this particular Bayesian computational analysis is 'Win-Stay/Lose-Switch' (WSLS).
+
 **The 2023 IGT data, as well as much of this repository's skeleton and code, is obtained from the following repository, by Mina Almasi (@MinaAlmasi) and Anton Drasbæk Schiønning (@drasbaek): https://github.com/MinaAlmasi/ChatGPT-IGT**.
 
 ## Repository Structure:

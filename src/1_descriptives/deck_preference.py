@@ -15,93 +15,62 @@ def set_font():
         # set font size to 13
         plt.rcParams.update({'font.size': 12})
 
-def calculate_deck_preferences(data):
-    # create a new column that indicates the trial number
+def calculate_deck_preferences(data, window_size=10):
+    data = data.copy()
     data['trial'] = data.groupby('subjID').cumcount() + 1
+    data['x'] = data['x'].replace([1, 2, 3, 4], ['A', 'B', 'C', 'D'])
 
-    # replace 1,2,3,4 with A,B,C,D for 'x' column
-    data['x'] = data['x'].replace([1,2,3,4], ['A','B','C','D'])
+    # one indicator column per deck (1 if chosen on that trial)
+    decks = ['A', 'B', 'C', 'D']
+    dummies = pd.get_dummies(data['x']).reindex(columns=decks, fill_value=0).astype(float)
+    dummies['subjID'] = data['subjID']
+    dummies['trial'] = data['trial']
 
-    grouped = data.groupby(['trial', 'x']).size().unstack(fill_value=0)
-    # Calculate the proportion of each 'x' value in each trial
-    proportions = grouped.div(grouped.sum(axis=1), axis=0)
+    # smooth within each subject (centered window)
+    smoothed = (dummies.groupby('subjID')[decks]
+                .transform(lambda s: s.rolling(window_size, center=True, min_periods=1).mean()))
+    smoothed['trial'] = dummies['trial']
 
-    # Reset the index to have 'trial' as a column
-    proportions.reset_index(inplace=True)
+    # mean and standard error across subjects for each trial (IT WAS THE GROUP CURVE BEFORE, NOT STANDARD ERROR)
+    g = smoothed.groupby('trial')[decks]
+    mean = g.mean()
+    se = g.std() / np.sqrt(g.count())
+    return mean, se
 
-    return proportions
 
-
-def plot_deck_preferences(data1, data2, data3, labels, window_size=10, save_path=None):
-    # Create a plot with three subplots
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 10))
-
-    # add space between subplots
+def plot_deck_preferences(data1, data2, data3, labels, save_path=None):
+    fig, axes = plt.subplots(3, 1, figsize=(10, 10))
     fig.subplots_adjust(hspace=0.5, top=0.90)
 
-    # Define colors for all four decks
     colors = ["#F59B8C", "#B43622", "#A1E780", "#3CA50A"]
+    decks = ['A', 'B', 'C', 'D']
 
-    # loop over both subplots and datasets
-    for i, (ax, data) in enumerate(zip([ax1, ax2, ax3], [data1, data2, data3])):
-        # Apply smoothing
-        smooth_data = data.iloc[:, 1:].rolling(window=window_size, min_periods=1).mean()
-        std_error = data.iloc[:, 1:].rolling(window=window_size, min_periods=1).std()
-        
-        # Calculate confidence interval (95%)
-        ci = 1.96 * std_error / np.sqrt(window_size)
+    for i, (ax, (mean, se)) in enumerate(zip(axes, [data1, data2, data3])):
+        trials = mean.index
+        for j, deck in enumerate(decks):
+            ci = 1.96 * se[deck]
+            ax.plot(trials, mean[deck], color=colors[j])
+            ax.fill_between(trials,
+                            np.clip(mean[deck] - ci, 0, 1),
+                            np.clip(mean[deck] + ci, 0, 1),
+                            color=colors[j], alpha=0.1)
 
-        alpha = 0.1
-
-        # Plotting line and shaded confidence interval on the correct axis
-        for j, deck in enumerate(smooth_data.columns):
-            ax.plot(data['trial'], smooth_data[deck], label=deck, color=colors[j])
-            lower_bound = np.maximum(smooth_data[deck] - ci[deck], 0)
-            upper_bound = np.minimum(smooth_data[deck] + ci[deck], 1)
-            ax.fill_between(data['trial'], lower_bound, upper_bound, color=colors[j], alpha=alpha)
-        
-        # set x-axis ticks to every 10th trial
         ax.set_xticks(np.arange(0, 101, 10))
-
-        # set y-axis ticks to every 0.1
         ax.set_yticks(np.arange(0, 1.1, 0.1))
-
-        # add very light grid
         ax.grid(color='grey', linestyle='-', linewidth=0.25, alpha=0.5)
-
-        # set title
         ax.set_title(labels[i], pad=10)
+        ax.set_ylabel('Choice Proportions')
+        ax.set_xlabel('Trial number')
+        ax.set_xlim(0, 100)
 
-    # add custom legend
-    custom_lines = [Line2D([0], [0], color=colors[0], lw=2),
-                    Line2D([0], [0], color=colors[1], lw=2),
-                    Line2D([0], [0], color=colors[2], lw=2),
-                    Line2D([0], [0], color=colors[3], lw=2)]
+    axes[0].set_ylim(0, 0.5)
+    axes[1].set_ylim(0, 0.5)
+    axes[2].set_ylim(0, 0.9)
 
-    # add legend
-    fig.legend(custom_lines, ['Deck A', 'Deck B', 'Deck C', 'Deck D'], loc='upper center', bbox_to_anchor=(0.5, 0.98), ncol=4)
+    custom_lines = [Line2D([0], [0], color=c, lw=2) for c in colors]
+    fig.legend(custom_lines, ['Deck A', 'Deck B', 'Deck C', 'Deck D'],
+               loc='upper center', bbox_to_anchor=(0.5, 0.98), ncol=4)
 
-    # add y-axis label
-    ax1.set_ylabel('Choice Proportions')
-    ax2.set_ylabel('Choice Proportions')
-    ax3.set_ylabel('Choice Proportions')
-
-    # add x-axis label
-    ax1.set_xlabel('Trial number')
-    ax2.set_xlabel('Trial number')
-    ax3.set_xlabel('Trial number')
-
-    # expand y axis
-    ax1.set_ylim(0, 0.5)
-    ax2.set_ylim(0, 0.5)
-    ax3.set_ylim(0, 0.9)
-    
-    #limit x axis
-    ax1.set_xlim(0, 100)
-    ax2.set_xlim(0, 100)
-    ax3.set_xlim(0, 100)
-
-    # save the plot
     if save_path is not None:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
 

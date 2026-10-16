@@ -13,68 +13,52 @@ def set_font():
         # set font size to 13
         plt.rcParams.update({'font.size': 13})
 
-def calculate_deck_switches(data):
-    # create a new column that indicates the trial number
+def calculate_deck_switches(data, window_size=10):
+    data = data.copy()
     data['trial'] = data.groupby('subjID').cumcount() + 1
-
-    # create a new column that indicates the deck chosen on the previous trial
     data['x_last_trial'] = data.groupby('subjID')['x'].shift()
+    data = data[data['trial'] != 1]                       # no previous choice on trial 1
+    data['deck_switch'] = (data['x'] != data['x_last_trial']).astype(float)
 
-    # ensure new column is int (unless it is NaN)
-    data['x_last_trial'] = data['x_last_trial'].fillna(0).astype(int)
+    # smooth within each subject (centered window)
+    data['switch_smooth'] = (data.groupby('subjID')['deck_switch']
+                             .transform(lambda s: s.rolling(window_size, center=True, min_periods=1).mean()))
 
-    # create a column that indicates whether the deck was switched
-    data['deck_switch'] = data['x'] != data['x_last_trial']
+    # mean and standard error across subjects for each trial (IT WAS THE GROUP CURVE BEFORE, NOT STANDARD ERROR)
+    g = data.groupby('trial')['switch_smooth']
+    return pd.DataFrame({'trial': g.mean().index,
+                         'mean': g.mean().values,
+                         'se': (g.std() / np.sqrt(g.count())).values})
 
-    # create a new dataframe that indicates the proportion of subjects that switched decks on each trial
-    deck_switch_prop = data.groupby('trial')['deck_switch'].mean().reset_index()
-
-    # disregard trial one
-    deck_switch_prop = deck_switch_prop[deck_switch_prop['trial'] != 1]
-
-    return deck_switch_prop
-
-def plot_deck_switch_with_confidence(data1, data2, data3, labels, window_size=10, save_path=None):
-    # Create a plot
+def plot_deck_switch_with_confidence(data1, data2, data3, labels, save_path=None):
     fig, ax = plt.subplots(figsize=(10, 8))
 
-    # Define colors
     colors = ["#52993C", "#3C5299", "#99523C"]
-    alpha = 0.3  # Transparency for confidence interval
+    alpha = 0.3  # transparency for confidence interval
 
-    # set x-axis ticks to every 10th trial
     ax.set_xticks(np.arange(0, 101, 10))
-
-    # set y-axis ticks to every 0.1
     ax.set_yticks(np.arange(0, 1.1, 0.1))
-
-    # add very light grid
     ax.grid(color='grey', linestyle='-', linewidth=0.25, alpha=0.5)
 
-    lines = []  # To store line objects for legend
+    lines = []
     for i, data in enumerate([data1, data2, data3]):
-        # Apply smoothing
-        smooth_data = data['deck_switch'].rolling(window=window_size, min_periods=1).mean()
-        std_error = data['deck_switch'].rolling(window=window_size, min_periods=1).std()
-        
-        # Calculate confidence interval (95%)
-        ci = 1.96 * std_error / np.sqrt(window_size)  # 95% CI
-
-        # Plotting line and shaded confidence interval
-        line, = ax.plot(data['trial'], smooth_data, label=labels[i], color=colors[i])
-        ax.fill_between(data['trial'], (smooth_data - ci), (smooth_data + ci), color=colors[i], alpha=alpha)
-
+        ci = 1.96 * data['se']
+        line, = ax.plot(data['trial'], data['mean'], label=labels[i], color=colors[i])
+        ax.fill_between(data['trial'],
+                        np.clip(data['mean'] - ci, 0, 1),
+                        np.clip(data['mean'] + ci, 0, 1),
+                        color=colors[i], alpha=alpha)
         lines.append(line)
 
-    # expand y axis
-    ax.set_ylim(0, 1)
+    # switch rate expected under random choice among four decks
+    ax.axhline(0.75, linestyle='--', color='grey', linewidth=1)
 
-    # Add labels and custom legend
+    ax.set_ylim(0, 1)
+    ax.set_xlim(0, 100)
     ax.set_xlabel("Trial")
     ax.set_ylabel("Proportion of Deck Switches at Trial")
     ax.legend(handles=lines, labels=labels)
 
-    # save the plot
     if save_path is not None:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
 

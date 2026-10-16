@@ -15,9 +15,10 @@ model_tag <- ifelse(WSLS, "WSLS", "Softmax")
 
 # new root path (name the code folder this)
 root_path <- "~/IGT_LLM_DecisionMaking"
+root_path <- "C:/Users/Igiba/Documents/decision_making_course/IGT_GPT_DecisionMaking2026" #on laptop, too lazy to fix
 
 # select group and read in data 
-group_name = groups[3] # grp1: human, grp2: gpt_old, grp3: gpt_new
+group_name = groups[1] # grp1: human, grp2: gpt_old, grp3: gpt_new
 
 ### CODE ###
 
@@ -54,12 +55,12 @@ jags_data <- list("x", "X", "ntrials", "nsubs")
 # parameters and model file
 if (WSLS) {
   params <- c(
-    "mu_prob_stay_win", "mu_prob_stay_lose", "mu_epsilon", 
-    "lambda_prob_stay_win", "lambda_prob_stay_lose", "lambda_epsilon",
-    "prob_stay_win", "prob_stay_lose", "epsilon",
-    "x_pred", "deviance"
+    "mu_prob_stay_win", "mu_prob_switch_lose",
+    "lambda_prob_stay_win", "lambda_prob_switch_lose",
+    "prob_stay_win", "prob_switch_lose",
+    "x_pred", "deviance" # -> NO EPSILON, WHY WAS IT EVER THERE TO BEGIN WITH?
   )
-  model_file <- file.path(root_path, "models", "simpler_models", "WSLS_hier.txt")
+  model_file <- file.path(root_path, "models", "simpler_models", "2nd_try", "WSLS_hier_no_epsilon.txt")
 } else {
   params <- c(
     "mu_alpha", "mu_theta", 
@@ -114,11 +115,9 @@ Y <- samples$BUGSoutput$sims.list
 if (WSLS) {
   df <- data.frame(
     mu_prob_stay_win = Y$mu_prob_stay_win,
-    mu_prob_stay_lose = Y$mu_prob_stay_lose,
-    mu_epsilon = Y$mu_epsilon,
+    mu_prob_switch_lose = Y$mu_prob_switch_lose,
     lambda_prob_stay_win = Y$lambda_prob_stay_win,
-    lambda_prob_stay_lose = Y$lambda_prob_stay_lose,
-    lambda_epsilon = Y$lambda_epsilon
+    lambda_prob_switch_lose = Y$lambda_prob_switch_lose,
   )
 } else {
   df <- data.frame(
@@ -138,8 +137,7 @@ plotfile <- file.path(
 if (WSLS) {
   trace_params <- c(
     "mu_prob_stay_win",
-    "mu_prob_stay_lose",
-    "mu_epsilon",
+    "mu_prob_switch_lose",
     "deviance"
   )
 } else {

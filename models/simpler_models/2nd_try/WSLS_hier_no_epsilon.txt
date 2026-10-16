@@ -1,0 +1,65 @@
+model {
+  
+  # Hyperpriors for group-level distributions
+  # Using probit transformation for parameters bounded [0,1]
+  # NO EPSILON ANYMORE
+  
+  # prob_stay_win: probability of staying after a win
+  mu_prob_stay_win_raw ~ dnorm(0, 1)
+  lambda_prob_stay_win ~ dgamma(1, 0.5) #made slightly more informative (less to explore)
+  mu_prob_stay_win <- phi(mu_prob_stay_win_raw)
+  
+  # prob_switch_lose: probability of switching after a loss (FIXED!!! WAS WRONG BEFORE)
+  mu_prob_switch_lose_raw ~ dnorm(0, 1)
+  lambda_prob_switch_lose ~ dgamma(1, 0.5) #made slightly more informative (less to explore)
+  mu_prob_switch_lose <- phi(mu_prob_switch_lose_raw)
+  
+  
+  # Loop through subjects
+  for (s in 1:nsubs) {
+    
+    # Subject-level parameters (probit-transformed)
+    prob_stay_win_raw[s] ~ dnorm(mu_prob_stay_win_raw, lambda_prob_stay_win)
+    prob_stay_win[s] <- phi(prob_stay_win_raw[s])
+    
+    prob_switch_lose_raw[s] ~ dnorm(mu_prob_switch_lose_raw, lambda_prob_switch_lose)
+    prob_switch_lose[s] <- phi(prob_switch_lose_raw[s])
+    
+    # Initialize first trial - equal probabilities for all decks
+    p[s, 1, 1] <- 0.25
+    p[s, 1, 2] <- 0.25
+    p[s, 1, 3] <- 0.25
+    p[s, 1, 4] <- 0.25
+    
+    # Sample first predicted choice
+    x_pred[s, 1] ~ dcat(p[s, 1, ])
+    
+    # Loop through trials starting from trial 2
+    for (t in 2:ntrials[s]) {
+      
+      # Determine if previous outcome was a win or loss
+      is_win[s, t] <- ifelse(X[s, t-1] >= 0, 1, 0)
+      
+      # Determine stay probability based on previous outcome
+      # (after a loss, staying = 1 - P(switch | lose))
+      stay_prob[s, t] <- ifelse(is_win[s, t] == 1, 
+                                 prob_stay_win[s], 
+                                 1 - prob_switch_lose[s])
+      
+      # Calculate choice probabilities for each deck
+      for (d in 1:4) {
+        
+        # Previous deck gets stay_prob; the other three split the rest
+        p[s, t, d] <- ifelse(d == x[s, t-1], 
+                             stay_prob[s, t], 
+                             (1 - stay_prob[s, t]) / 3)
+      }
+      
+      # Sample choice from categorical distribution
+      x[s, t] ~ dcat(p[s, t, ])
+      
+      # One-step-ahead predicted choice (given the actual previous choice and outcome)
+      x_pred[s, t] ~ dcat(p[s, t, ])
+    }
+  }
+}

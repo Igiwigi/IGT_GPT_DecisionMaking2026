@@ -1,5 +1,5 @@
 # ============================================================================
-# GROUP & INDIV PARAMETER RECOVERY - HIERARCHICAL WSLS (win-stay / lose-stay + epsilon)
+# GROUP & INDIV PARAMETER RECOVERY - HIERARCHICAL WSLS (win-stay / lose-stay)
 #
 # This script performs parameter recovery for a hierarchical WSLS model using simulated group data stored in JSON format. 
 # It fits the model using JAGS, extracts inferred parameters, and compares them to the true parameters used in the simulations.
@@ -32,8 +32,8 @@ print(paste0("Simulation started: ", start_time))
 # ---------------------------
 # INIT PARAM STORAGE
 # ---------------------------
-params <- c("mu_prob_stay_win_raw", "mu_prob_stay_lose_raw", "mu_epsilon_raw")
-lambda_params <- c("lambda_prob_stay_win", "lambda_prob_stay_lose", "lambda_epsilon")
+params <- c("mu_prob_stay_win_raw", "mu_prob_switch_lose_raw")
+lambda_params <- c("lambda_prob_stay_win", "lambda_prob_switch_lose")
 
 # Group-level parameter storage
 true_mu <- matrix(NA, nrow=n_groups, ncol=length(params))
@@ -43,8 +43,8 @@ infer_lambda <- matrix(NA, nrow=n_groups, ncol=length(lambda_params))
 
 # Individual-level parameter storage
 max_nsubs <- max(sapply(data$x, nrow))
-indiv_params <- c("prob_stay_win", "prob_stay_lose", "epsilon")  # For JAGS output
-indiv_params_json <- c("prob_stay_win_sub", "prob_stay_lose_sub", "epsilon_sub")  # From JSON
+indiv_params <- c("prob_stay_win", "prob_switch_lose")  # For JAGS output
+indiv_params_json <- c("prob_stay_win_sub", "prob_switch_lose_sub")  # From JSON
 true_indiv <- array(NA, dim=c(n_groups, max_nsubs, length(indiv_params)))
 infer_indiv <- array(NA, dim=c(n_groups, max_nsubs, length(indiv_params)))
 
@@ -81,13 +81,11 @@ for (i in 1:n_groups) {
   
   # extract true group parameters
   mu_prob_stay_win_raw <- as.numeric(data$mu_prob_stay_win_raw[i])
-  mu_prob_stay_lose_raw <- as.numeric(data$mu_prob_stay_lose_raw[i])
-  mu_epsilon_raw <- as.numeric(data$mu_epsilon_raw[i])
-  
+  mu_prob_switch_lose_raw <- as.numeric(data$mu_prob_switch_lose_raw[i])
+
   lambda_prob_stay_win <- as.numeric(data$lambda_prob_stay_win[i])
-  lambda_prob_stay_lose <- as.numeric(data$lambda_prob_stay_lose[i])
-  lambda_epsilon <- as.numeric(data$lambda_epsilon[i])
-  
+  lambda_prob_switch_lose <- as.numeric(data$lambda_prob_switch_lose[i])
+
   # extract true individual parameters
   for(p_idx in 1:length(indiv_params)) {
     p_json <- indiv_params_json[p_idx]  # Use _sub suffix for JSON
@@ -128,7 +126,7 @@ for (i in 1:n_groups) {
   
   # parameters to monitor
   jags_params <- c(params, lambda_params, indiv_params)
-  model_file <- file.path(root_path, "models", "simpler_models", "WSLS_hier.txt")
+  model_file <- file.path(root_path, "models", "simpler_models", "2nd_try", "WSLS_hier_no_epsilon.txt")
   
   # run JAGS
   cat("Running JAGS ...\n")
@@ -167,11 +165,11 @@ for (i in 1:n_groups) {
   sims <- samples$BUGSoutput$sims.list
   
   # store true and inferred group mu medians 
-  true_mu[i, ] <- c(mu_prob_stay_win_raw, mu_prob_stay_lose_raw, mu_epsilon_raw)
+  true_mu[i, ] <- c(mu_prob_stay_win_raw, mu_prob_switch_lose_raw)
   infer_mu[i, ] <- sapply(params, function(p) median(sims[[p]]))
   
   # store true and inferred group lambda medians
-  true_lambda[i, ] <- c(lambda_prob_stay_win, lambda_prob_stay_lose, lambda_epsilon)
+  true_lambda[i, ] <- c(lambda_prob_stay_win, lambda_prob_switch_lose)
   infer_lambda[i, ] <- sapply(lambda_params, function(p) median(sims[[p]]))
   
   # store inferred individual parameters (using median instead of MPD)
@@ -205,17 +203,13 @@ for (i in 1:n_groups) {
     max_rhat = max_rhat,
     min_ess = min_ess,
     true_mu_prob_stay_win_raw = true_mu[,1], #raw = probit (maybe odd, inconsistent naming here) (don't feel like fixing it at present) (matches the model)
-    true_mu_prob_stay_lose_raw = true_mu[,2],
-    true_mu_epsilon_raw = true_mu[,3],
+    true_mu_prob_switch_lose_raw = true_mu[,2],
     infer_mu_prob_stay_win_raw = infer_mu[,1],
-    infer_mu_prob_stay_lose_raw = infer_mu[,2],
-    infer_mu_epsilon_raw = infer_mu[,3],
+    infer_mu_prob_switch_lose_raw = infer_mu[,2],
     true_lambda_prob_stay_win = true_lambda[,1],
-    true_lambda_prob_stay_lose = true_lambda[,2],
-    true_lambda_epsilon = true_lambda[,3],
+    true_lambda_prob_switch_lose = true_lambda[,2],
     infer_lambda_prob_stay_win = infer_lambda[,1],
-    infer_lambda_prob_stay_lose = infer_lambda[,2],
-    infer_lambda_epsilon = infer_lambda[,3],
+    infer_lambda_prob_switch_lose = infer_lambda[,2],
     rhat_vals
   )
   
@@ -233,11 +227,9 @@ for (i in 1:n_groups) {
           group_id = g,
           subject_id = s,
           true_prob_stay_win = true_indiv[g, s, 1],
-          true_prob_stay_lose = true_indiv[g, s, 2],
-          true_epsilon = true_indiv[g, s, 3],
+          true_prob_switch_lose = true_indiv[g, s, 2],
           infer_prob_stay_win = infer_indiv[g, s, 1],
-          infer_prob_stay_lose = infer_indiv[g, s, 2],
-          infer_epsilon = infer_indiv[g, s, 3]
+          infer_prob_switch_lose = infer_indiv[g, s, 2]
         )
       }
     }
@@ -261,7 +253,7 @@ for (i in 1:n_groups) {
     # plot mu parameters
     png(plot_mu_file, width = 1800, height = 600, res = 150)
     par(mfrow=c(1,3), mar=c(3,3,2,1))
-    for(p in c("prob_stay_win_raw", "prob_stay_lose_raw", "epsilon_raw")) {
+    for(p in c("prob_stay_win_raw", "prob_switch_lose_raw")) {
       true_vals <- df_group[[paste0("true_mu_", p)]][completed]
       infer_vals <- df_group[[paste0("infer_mu_", p)]][completed]
       plot(true_vals, infer_vals, main=p, xlab="True", ylab="Inferred")
@@ -278,7 +270,7 @@ for (i in 1:n_groups) {
     # plot lambda parameters
     png(plot_lambda_file, width = 1800, height = 600, res = 150)
     par(mfrow=c(1,3), mar=c(3,3,2,1))
-    for(p in c("prob_stay_win", "prob_stay_lose", "epsilon")) {
+    for(p in c("prob_stay_win", "prob_switch_lose")) {
       true_vals <- df_group[[paste0("true_lambda_", p)]][completed]
       infer_vals <- df_group[[paste0("infer_lambda_", p)]][completed]
       plot(true_vals, infer_vals, main=p, xlab="True", ylab="Inferred")
@@ -294,12 +286,12 @@ for (i in 1:n_groups) {
     
     # plot individual parameters
     if(length(df_indiv_list) > 0) {
-      df_indiv_complete <- df_indiv[complete.cases(df_indiv[,3:8]), ]
+      df_indiv_complete <- df_indiv[complete.cases(df_indiv), ]
       
       if(nrow(df_indiv_complete) >= 10) {
         png(plot_indiv_file, width = 1800, height = 600, res = 150)
         par(mfrow=c(1,3), mar=c(3,3,2,1))
-        for(p in c("prob_stay_win", "prob_stay_lose", "epsilon")) {
+        for(p in c("prob_stay_win", "prob_switch_lose")) {
           true_vals <- df_indiv_complete[[paste0("true_", p)]]
           infer_vals <- df_indiv_complete[[paste0("infer_", p)]]
           plot(true_vals, infer_vals, main=paste("Individual", p), 
@@ -341,7 +333,7 @@ df_complete <- df_group[completed,]
 # ---------------------------
 
 # mu parameters
-for(p in c("prob_stay_win_raw","prob_stay_lose_raw","epsilon_raw")) {
+for(p in c("prob_stay_win_raw","prob_switch_lose_raw")) {
   true_v  <- df_complete[[paste0("true_mu_", p)]]
   infer_v <- df_complete[[paste0("infer_mu_", p)]]
   
@@ -358,7 +350,7 @@ for(p in c("prob_stay_win_raw","prob_stay_lose_raw","epsilon_raw")) {
 }
 
 # lambda parameters
-for(p in c("prob_stay_win","prob_stay_lose","epsilon")) {
+for(p in c("prob_stay_win","prob_switch_lose")) {
   true_v  <- df_complete[[paste0("true_lambda_", p)]]
   infer_v <- df_complete[[paste0("infer_lambda_", p)]]
   
@@ -382,10 +374,10 @@ cat(sprintf("Updated group CSV with recovery metrics: %s\n", basename(csv_file))
 # INDIVIDUAL-LEVEL RECOVERY METRICS
 # ---------------------------
 if(exists("df_indiv") && nrow(df_indiv) > 0) {
-  df_indiv_complete <- df_indiv[complete.cases(df_indiv[,3:8]), ]
+  df_indiv_complete <- df_indiv[complete.cases(df_indiv), ]
   
   df_indiv_summary <- data.frame()
-  for(p in c("prob_stay_win","prob_stay_lose","epsilon")) {
+  for(p in c("prob_stay_win","prob_switch_lose")) {
     true_v  <- df_indiv_complete[[paste0("true_", p)]]
     infer_v <- df_indiv_complete[[paste0("infer_", p)]]
     
@@ -426,8 +418,7 @@ df_diag <- df_group
 
 # Transform raw mus to probability scale
 df_diag$true_prob_stay_win <- pnorm(df_diag$true_mu_prob_stay_win_raw)
-df_diag$true_prob_stay_lose <- pnorm(df_diag$true_mu_prob_stay_lose_raw)
-df_diag$true_epsilon_prob  <- pnorm(df_diag$true_mu_epsilon_raw)
+df_diag$true_prob_switch_lose <- pnorm(df_diag$true_mu_prob_switch_lose_raw)
 
 # Flag problematic convergence
 df_diag$bad_rhat <- df_diag$max_rhat > 1.1
@@ -436,9 +427,9 @@ table(df_diag$bad_rhat, useNA = "ifany")
 # Summaries
 cat("\nMean transformed parameters by Rhat group:\n")
 print(aggregate(
-  cbind(true_prob_stay_win, true_prob_stay_lose, true_epsilon_prob,
-        Rhat_mu_prob_stay_win_raw, Rhat_mu_prob_stay_lose_raw, Rhat_mu_epsilon_raw,
-        Rhat_lambda_prob_stay_win, Rhat_lambda_prob_stay_lose, Rhat_lambda_epsilon) ~ bad_rhat,
+  cbind(true_prob_stay_win, true_prob_switch_lose,
+        Rhat_mu_prob_stay_win_raw, Rhat_mu_prob_switch_lose_raw,
+        Rhat_lambda_prob_stay_win, Rhat_lambda_prob_switch_lose) ~ bad_rhat,
   data = df_diag,
   FUN = mean,
   na.rm = TRUE
@@ -451,7 +442,7 @@ extreme_percent <- function(x) {
 
 #amount of extreme variables, in percent (around 8-13%)
 print(aggregate(
-  cbind(true_prob_stay_win, true_prob_stay_lose, true_epsilon_prob) ~ bad_rhat,
+  cbind(true_prob_stay_win, true_prob_switch_lose) ~ bad_rhat,
   data = df_diag,
   FUN = extreme_percent
 ))

@@ -1,4 +1,4 @@
-group,rhat_prob_stay_win,rhat_prob_stay_lose,rhat_epsilon,n_eff_prob_stay_win,n_eff_prob_stay_lose,n_eff_epsilon
-human,1.004,1.012,1.02,1400,220,110
-gpt2023,1.004,1.001,1.012,630,7500,220
-gpt2025,1.002,1.001,1.008,2600,5600,1400
+group,rhat_prob_stay_win,rhat_prob_switch_lose,n_eff_prob_stay_win,n_eff_prob_switch_lose
+human,1.001,1.001,6800,24000
+gpt2023,1.001,1.001,7300,7500
+gpt2025,1.001,1.002,6200,1600

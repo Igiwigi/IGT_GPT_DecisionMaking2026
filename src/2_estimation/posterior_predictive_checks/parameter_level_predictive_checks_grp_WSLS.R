@@ -10,6 +10,8 @@ set.seed(2026)
 # Paths and group names
 # -------------------------------
 root_path <- "~/IGT_LLM_DecisionMaking"
+root_path <- "C:/Users/Igiba/Documents/decision_making_course/IGT_GPT_DecisionMaking2026" #on laptop, too lazy to fix
+
 groups <- c("ahn_hc", "gpt_OLD_2023", "gpt_NEW_2025")  # human → old → new
 
 # -------------------------------
@@ -31,20 +33,17 @@ simulate_subjects_wsls <- function(params, nsub=500){
   
   # Convert precisions to SDs
   sigma_prob_stay_win <- 1 / sqrt(max(row$lambda_prob_stay_win, 1e-6))
-  sigma_prob_stay_lose <- 1 / sqrt(max(row$lambda_prob_stay_lose, 1e-6))
-  sigma_epsilon <- 1 / sqrt(max(row$lambda_epsilon, 1e-6))
-  
+  sigma_prob_switch_lose <- 1 / sqrt(max(row$lambda_prob_switch_lose, 1e-6))
+
   # Simulate subject-level parameters on raw (probit) scale
   prob_stay_win_raw <- rnorm(nsub, mean=qnorm(row$mu_prob_stay_win), sd=sigma_prob_stay_win)
-  prob_stay_lose_raw <- rnorm(nsub, mean=qnorm(row$mu_prob_stay_lose), sd=sigma_prob_stay_lose)
-  epsilon_raw <- rnorm(nsub, mean=qnorm(row$mu_epsilon), sd=sigma_epsilon)
-  
+  prob_switch_lose_raw <- rnorm(nsub, mean = qnorm(row$mu_prob_switch_lose), sd=sigma_prob_switch_lose)
+
   # Transform to [0,1] using probit inverse (pnorm)
   prob_stay_win <- pnorm(prob_stay_win_raw)
-  prob_stay_lose <- pnorm(prob_stay_lose_raw)
-  epsilon <- pnorm(epsilon_raw)
-  
-  df <- data.frame(prob_stay_win, prob_stay_lose, epsilon)
+  prob_switch_lose <- pnorm(prob_switch_lose_raw)
+
+  df <- data.frame(prob_stay_win, prob_switch_lose)
   return(df)
 }
 
@@ -62,8 +61,8 @@ for(g in groups){
   
   # Store all simulated subjects across draws
   sim_all <- list()
-  sd_matrix <- matrix(NA, nrow=n_draws, ncol=3)
-  colnames(sd_matrix) <- c("prob_stay_win", "prob_stay_lose", "epsilon")
+  sd_matrix <- matrix(NA, nrow=n_draws, ncol=2)
+  colnames(sd_matrix) <- c("prob_stay_win", "prob_switch_lose")
   
   for(i in 1:n_draws){
     sim <- simulate_subjects_wsls(param_df, nsub=nsub)
@@ -107,17 +106,17 @@ cat("Simulated subject-level parameters saved to:\n", save_file, "\n")
 # Plot posterior predictive densities for all parameters
 # -------------------------------
 sim_df_long <- sim_df_all %>%
-  pivot_longer(cols = c(prob_stay_win, prob_stay_lose, epsilon),
+  pivot_longer(cols = c(prob_stay_win, prob_switch_lose),
                names_to = "parameter",
                values_to = "value")
 
 # Create more interpretable parameter labels
 sim_df_long$parameter <- factor(sim_df_long$parameter,
-                                levels = c("prob_stay_win", "prob_stay_lose", "epsilon"),
-                                labels = c("P(Stay|Win)", "P(Stay|Lose)", "Exploration (ε)"))
+                                levels = c("prob_stay_win", "prob_switch_lose"),
+                                labels = c("P(Stay|Win)", "P(Switch|Lose)"))
 
 plot_all <- ggplot(sim_df_long, aes(x = value, fill = group, color = group)) +
-  geom_density(alpha = 0.3, size = 1) +   # semi-transparent fills
+  geom_density(alpha = 0.3, linewidth = 1) +   # semi-transparent fills
   facet_wrap(~parameter, scales = "free", nrow = 1) +
   theme_bw(base_size = 14) +              # base_size controls overall text
   labs(
@@ -143,7 +142,7 @@ plot_all <- ggplot(sim_df_long, aes(x = value, fill = group, color = group)) +
 plot_file <- file.path(root_path, "src", "2_estimation",
                        "posterior_predictive_checks", "parameter_level", 
                        "posterior_predictive_all_parameters_WSLS_model.png")
-ggsave(plot_file, plot_all, width=12, height=6, dpi=400)
+ggsave(plot_file, plot_all, width=9, height=6, dpi=400)
 cat("Density plot saved to:\n", plot_file, "\n")
 
 # -------------------------------
@@ -159,8 +158,8 @@ sd_table_all <- bind_rows(
 
 # Order factors with interpretable labels
 sd_table_all$parameter <- factor(sd_table_all$parameter,
-                                 levels = c("prob_stay_win", "prob_stay_lose", "epsilon"),
-                                 labels = c("P(Stay|Win)", "P(Stay|Lose)", "Exploration (ε)"))
+                                 levels = c("prob_stay_win", "prob_switch_lose"),
+                                 labels = c("P(Stay|Win)", "P(Switch|Lose)"))
 sd_table_all$group <- factor(sd_table_all$group, 
                              levels=c("ahn_hc","gpt_OLD_2023","gpt_NEW_2025"))
 

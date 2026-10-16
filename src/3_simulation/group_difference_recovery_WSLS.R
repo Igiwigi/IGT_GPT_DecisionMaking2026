@@ -2,7 +2,9 @@
 # GROUP DIFFERENCE RECOVERY - HIERARCHICAL WSLS (3 groups: Human, GPT2023, GPT2025)
 # Run visualization script separately after this completes!!
 # ============================================================================
-# This script runs the parameter recovery simulation and saves all results (to see group difference recovery!!) (mostly interested in mu parameters)
+# This script runs the parameter recovery simulation and saves all results (to see group difference recovery!!) 
+#(mostly interested in mu parameters)
+
 # a bit of a mess unfortunately (could have done this cleaner/less drawn out)
 
 library(pacman)
@@ -15,9 +17,10 @@ probit_to_prob <- function(x) pnorm(x) #to change probit to probability
 # PATHS
 # ---------------------------
 root_path <- "~/IGT_LLM_DecisionMaking"
+#root_path <- "C:/Users/Igiba/Documents/decision_making_course/IGT_GPT_DecisionMaking2026" #on laptop, too lazy to fix
 results_dir <- file.path(root_path, "src/3_simulation/recovery/results/group_diff")
 dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
-model_file <- file.path(root_path, "models", "simpler_models", "WSLS_hier_grp_compare.txt")
+model_file <- file.path(root_path, "models", "simpler_models", "2nd_try", "WSLS_hier_grp_no_epsilon.txt")
 
 # Load simulated data from Python
 simulated_data_file <- file.path(root_path, "src/3_simulation/recovery/simulated_data/simulated_group_comparison_winlose.json")
@@ -28,6 +31,7 @@ simulated_data <- fromJSON(simulated_data_file)
 # ---------------------------
 n_simulations <- length(simulated_data$iteration) #this is 30; can do less for testing 
 group_names <- c("human", "gpt2023", "gpt2025")
+param_names <- c("prob_stay_win", "prob_switch_lose")
 
 # Extract TRUE parameters from the first iteration (they're the same for all iterations)
 true_params_raw <- simulated_data$true_params[[1]]
@@ -37,37 +41,31 @@ true_params <- list(
   human = list(
     mu = c(
       prob_stay_win_raw = true_params_raw$human$mu$prob_stay_win_raw,
-      prob_stay_lose_raw = true_params_raw$human$mu$prob_stay_lose_raw,
-      epsilon_raw = true_params_raw$human$mu$epsilon_raw
+      prob_switch_lose_raw = true_params_raw$human$mu$prob_switch_lose_raw
     ),
     lambda = c(
       prob_stay_win = true_params_raw$human$lambda$prob_stay_win,
-      prob_stay_lose = true_params_raw$human$lambda$prob_stay_lose,
-      epsilon = true_params_raw$human$lambda$epsilon
+      prob_switch_lose = true_params_raw$human$lambda$prob_switch_lose
     )
   ),
   gpt2023 = list(
     mu = c(
       prob_stay_win_raw = true_params_raw$gpt2023$mu$prob_stay_win_raw,
-      prob_stay_lose_raw = true_params_raw$gpt2023$mu$prob_stay_lose_raw,
-      epsilon_raw = true_params_raw$gpt2023$mu$epsilon_raw
+      prob_switch_lose_raw = true_params_raw$gpt2023$mu$prob_switch_lose_raw
     ),
     lambda = c(
       prob_stay_win = true_params_raw$gpt2023$lambda$prob_stay_win,
-      prob_stay_lose = true_params_raw$gpt2023$lambda$prob_stay_lose,
-      epsilon = true_params_raw$gpt2023$lambda$epsilon
+      prob_switch_lose = true_params_raw$gpt2023$lambda$prob_switch_lose
     )
   ),
   gpt2025 = list(
     mu = c(
       prob_stay_win_raw = true_params_raw$gpt2025$mu$prob_stay_win_raw,
-      prob_stay_lose_raw = true_params_raw$gpt2025$mu$prob_stay_lose_raw,
-      epsilon_raw = true_params_raw$gpt2025$mu$epsilon_raw
+      prob_switch_lose_raw = true_params_raw$gpt2025$mu$prob_switch_lose_raw
     ),
     lambda = c(
       prob_stay_win = true_params_raw$gpt2025$lambda$prob_stay_win,
-      prob_stay_lose = true_params_raw$gpt2025$lambda$prob_stay_lose,
-      epsilon = true_params_raw$gpt2025$lambda$epsilon
+      prob_switch_lose = true_params_raw$gpt2025$lambda$prob_switch_lose
     )
   )
 )
@@ -79,9 +77,9 @@ for (group_name in names(true_params)) {
   cat(sprintf("\n%s:\n", toupper(group_name)))
   mu <- true_params[[group_name]]$mu
   lambda <- true_params[[group_name]]$lambda
-  cat(sprintf("  mu: prob_stay_win=%.3f (p=%.3f), prob_stay_lose=%.3f (p=%.3f), epsilon=%.3f (p=%.3f)\n",
-              mu[1], pnorm(mu[1]), mu[2], pnorm(mu[2]), mu[3], pnorm(mu[3])))
-  cat(sprintf("  lambda: %.1f, %.1f, %.1f\n", lambda[1], lambda[2], lambda[3]))
+  cat(sprintf("  mu: prob_stay_win=%.3f (p=%.3f), prob_switch_lose=%.3f (p=%.3f)\n",
+              mu[1], pnorm(mu[1]), mu[2], pnorm(mu[2])))
+  cat(sprintf("  lambda: %.1f, %.1f\n", lambda[1], lambda[2]))
 }
 
 # ---------------------------
@@ -124,22 +122,17 @@ for(sim in 1:n_simulations){
       sim_id = sim,
       group = group_name,
       mu_prob_stay_win = probit_to_prob(mu_g[1]),
-      mu_prob_stay_lose = probit_to_prob(mu_g[2]),
-      mu_epsilon = probit_to_prob(mu_g[3]),
+      mu_prob_switch_lose = probit_to_prob(mu_g[2]),
       lambda_prob_stay_win = lambda_g[1],
-      lambda_prob_stay_lose = lambda_g[2],
-      lambda_epsilon = lambda_g[3]
+      lambda_prob_switch_lose = lambda_g[2]
     ))
   }
   
   # Prepare data for JAGS
-  # Convert outcomes to binary (win=1, lose=0)
-  X_binary <- ifelse(X_mat >= 0, 1, 0)
-  
   # JAGS data list
   jags_data <- list(
     x = x_mat,
-    X = X_binary,
+    X = X_mat,
     ntrials = apply(!is.na(x_mat), 1, sum),
     nsubs = nrow(x_mat),
     group = group_idx,
@@ -147,8 +140,8 @@ for(sim in 1:n_simulations){
   )
   
   #params for jags to keep track of
-  jags_params <- c("mu_prob_stay_win_raw","mu_prob_stay_lose_raw","mu_epsilon_raw",
-                   "lambda_prob_stay_win","lambda_prob_stay_lose","lambda_epsilon")
+  jags_params <- c("mu_prob_stay_win_raw","mu_prob_switch_lose_raw",
+                   "lambda_prob_stay_win","lambda_prob_switch_lose")
   
   cat("Running JAGS...\n")
   sim_start <- Sys.time()
@@ -189,9 +182,8 @@ for(sim in 1:n_simulations){
     
     # Posterior medians (probit)
     rec_mu_prob_stay_win <- median(samples$BUGSoutput$sims.list$mu_prob_stay_win_raw[,g])
-    rec_mu_prob_stay_lose <- median(samples$BUGSoutput$sims.list$mu_prob_stay_lose_raw[,g])
-    rec_mu_epsilon <- median(samples$BUGSoutput$sims.list$mu_epsilon_raw[,g])
-    
+    rec_mu_prob_switch_lose <- median(samples$BUGSoutput$sims.list$mu_prob_switch_lose_raw[,g])
+
     #what to keep in results (true, recovered, rhat, etc)
     #all in probit for now? (will plot in probability later)
     results <- rbind(results,data.frame(
@@ -199,36 +191,29 @@ for(sim in 1:n_simulations){
       
       #true vals (mu and lambda)
       true_mu_prob_stay_win=true_mu[1],
-      true_mu_prob_stay_lose=true_mu[2],
-      true_mu_epsilon=true_mu[3],
+      true_mu_prob_switch_lose=true_mu[2],
       true_lambda_prob_stay_win=true_lambda[1],
-      true_lambda_prob_stay_lose=true_lambda[2],
-      true_lambda_epsilon=true_lambda[3],
-      
+      true_lambda_prob_switch_lose=true_lambda[2],
+
       #recorded vals (mu and lambda)
       rec_mu_prob_stay_win=rec_mu_prob_stay_win,
-      rec_mu_prob_stay_lose=rec_mu_prob_stay_lose,
-      rec_mu_epsilon=rec_mu_epsilon,
+      rec_mu_prob_switch_lose=rec_mu_prob_switch_lose,
       rec_lambda_prob_stay_win=median(samples$BUGSoutput$sims.list$lambda_prob_stay_win[,g]),
-      rec_lambda_prob_stay_lose=median(samples$BUGSoutput$sims.list$lambda_prob_stay_lose[,g]),
-      rec_lambda_epsilon=median(samples$BUGSoutput$sims.list$lambda_epsilon[,g]),
-      
+      rec_lambda_prob_switch_lose=median(samples$BUGSoutput$sims.list$lambda_prob_switch_lose[,g]),
+
       #convergence stats: rhat & min effective sample size
       min_ess=min(summary_mat[param_rows_group,"n.eff"],na.rm=TRUE),
       max_rhat=max(summary_mat[param_rows_group,"Rhat"],na.rm=TRUE),
       rhat_prob_stay_win = summary_mat[paste0("mu_prob_stay_win_raw[",g,"]"), "Rhat"],
-      rhat_prob_stay_lose = summary_mat[paste0("mu_prob_stay_lose_raw[",g,"]"), "Rhat"],
-      rhat_epsilon = summary_mat[paste0("mu_epsilon_raw[",g,"]"), "Rhat"],
+      rhat_prob_switch_lose = summary_mat[paste0("mu_prob_switch_lose_raw[",g,"]"), "Rhat"],
       rhat_lambda_prob_stay_win = summary_mat[paste0("lambda_prob_stay_win[",g,"]"), "Rhat"],
-      rhat_lambda_prob_stay_lose = summary_mat[paste0("lambda_prob_stay_lose[",g,"]"), "Rhat"],
-      rhat_lambda_epsilon = summary_mat[paste0("lambda_epsilon[",g,"]"), "Rhat"]
+      rhat_lambda_prob_switch_lose = summary_mat[paste0("lambda_prob_switch_lose[",g,"]"), "Rhat"]
     ))
   }
   
   # ---------------------------
   # Extract group contrasts (get recorved and true vals, then use them to calculate contrast, IN PROBABILITY SPACE)
   # ---------------------------
-  param_names <- c("prob_stay_win","prob_stay_lose","epsilon")
   for(param in param_names){
     param_name <- paste0("mu_",param,"_raw")
     rec_vals <- sapply(1:length(group_names),function(g) median(samples$BUGSoutput$sims.list[[param_name]][,g]))
@@ -315,8 +300,8 @@ for(param in param_names){
   con_p <- contrasts[contrasts$parameter == param, ]
   
   for(contrast in contrast_names){
-    true_col <- paste0("true_diff_", contrast)
-    rec_col <- paste0("rec_diff_", contrast)
+    true_col <- paste0("true_diff_", contrast, "_prob")
+    rec_col  <- paste0("rec_diff_",  contrast, "_prob")
     
     #r <- cor(con_p[[true_col]], con_p[[rec_col]], use="complete.obs") #the sd is 0, not informative
     bias <- mean(con_p[[rec_col]] - con_p[[true_col]], na.rm=TRUE)
@@ -328,7 +313,7 @@ for(param in param_names){
       parameter = param,
       contrast = contrast,
       bias = bias,
-      #r = r, #the SD is 0, not informative
+      #r = r,
       rmse = rmse
     ))
   }

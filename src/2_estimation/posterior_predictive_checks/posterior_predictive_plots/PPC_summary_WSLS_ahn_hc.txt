@@ -3,15 +3,15 @@
 POSTERIOR PREDICTIVE CHECK SUMMARY
 ===============================================
 Group: ahn_hc 
-Model: WSLS (Win-Stay-Lose-Shift)
+Model: WSLS (Win-Stay-Lose-Switch)
 
-IF p value is <0.05 or >0.95, there is a significant mismatch between model and data!
+If a p value is < 0.05 or > 0.95, the model may be missing this aspect of the data (possible misfit).
 
 SWITCHES:
   Observed total: 2068
-  Predicted mean: 2067.0 [2003.0, 2129.0]
-  Bayesian p-value: 0.496
+  Predicted mean: 2066.6 [2005.0, 2131.0]
+  Bayesian p-value: 0.464
 
 WIN-STAY / LOSE-SWITCH:
-  Win-Stay:    Obs=0.328, Pred=0.325 [0.300, 0.350], p=0.402
-  Lose-Switch: Obs=0.808, Pred=0.790 [0.750, 0.829], p=0.189
+  Win-Stay:    Obs=0.326, Pred=0.326 [0.302, 0.352], p=0.526
+  Lose-Switch: Obs=0.804, Pred=0.802 [0.763, 0.842], p=0.465

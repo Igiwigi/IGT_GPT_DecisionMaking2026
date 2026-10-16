@@ -15,10 +15,10 @@ model_tag <- ifelse(WSLS, "WSLS", "Softmax")
 
 # new root path (name the code folder this)
 root_path <- "~/IGT_LLM_DecisionMaking"
-root_path <- "C:/Users/Igiba/Documents/decision_making_course/IGT_GPT_DecisionMaking2026" #on laptop, too lazy to fix
+#root_path <- "C:/Users/Igiba/Documents/decision_making_course/IGT_GPT_DecisionMaking2026" #on laptop, too lazy to fix
 
 # select group and read in data 
-group_name = groups[1] # grp1: human, grp2: gpt_old, grp3: gpt_new
+group_name = groups[3] # grp1: human, grp2: gpt_old, grp3: gpt_new
 
 ### CODE ###
 
@@ -104,7 +104,7 @@ print(summary_clean)
 
 # save clean summary
 summary_file <- file.path(
-  root_path, "src", "2_estimation", "results", "simpler_models",
+  root_path, "src", "2_estimation", "estimation_results", "simpler_models",
   paste0("summary_", model_tag, "_", group_name, ".txt")
 )
 write.table(summary_clean, summary_file)
@@ -117,7 +117,7 @@ if (WSLS) {
     mu_prob_stay_win = Y$mu_prob_stay_win,
     mu_prob_switch_lose = Y$mu_prob_switch_lose,
     lambda_prob_stay_win = Y$lambda_prob_stay_win,
-    lambda_prob_switch_lose = Y$lambda_prob_switch_lose,
+    lambda_prob_switch_lose = Y$lambda_prob_switch_lose
   )
 } else {
   df <- data.frame(
@@ -155,24 +155,24 @@ dev.off()
 
 # save parameter df
 savefile <- file.path(
-  root_path, "src", "2_estimation", "results", "simpler_models",
+  root_path, "src", "2_estimation", "estimation_results", "simpler_models",
   paste0("param_estimated_", model_tag, "_", group_name, ".csv")
 )
 write.csv(df, savefile, row.names = FALSE)
 
 # save DIC
 dic_file <- file.path(
-  root_path, "src", "2_estimation", "results", "simpler_models",
+  root_path, "src", "2_estimation", "estimation_results", "simpler_models",
   paste0("DIC_grouplevel_", model_tag, "_", group_name, ".txt")
 )
 write.table(samples$BUGSoutput$DIC, dic_file)
 
 # save full fit
 fitfile <- file.path(
-  root_path, "src", "2_estimation", "results", "simpler_models",
+  root_path, "src", "2_estimation", "estimation_results", "simpler_models",
   paste0("jags_fit_", model_tag, "_", group_name, ".RData")
 )
 save(samples, file = fitfile)
 
 print(paste("JAGS fit saved to:", fitfile))
-print(paste("Total runtime:", end_time - start_time))
+print(paste("Total runtime:", end_time - start_time, " minutes"))

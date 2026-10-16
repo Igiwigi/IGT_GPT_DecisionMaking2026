@@ -4,15 +4,17 @@
 # ============================================================================
 
 pacman::p_load(R2jags, ggplot2, dplyr, gridExtra)
+set.seed(2026) 
 
 # ---- Settings ----
 root_path <- "~/IGT_LLM_DecisionMaking"
+root_path <-  "C:/Users/Igiba/Documents/decision_making_course/IGT_GPT_DecisionMaking2026" #on laptop, too lazy to fix
 groups <- c("ahn_hc", "gpt_OLD_2023", "gpt_NEW_2025")
-group_name <- groups[3] # which group to do PPC on
+group_name <- groups[3] # which group to do PPC on (RUN 3 TIMES!)
 
 # ---- Load data ----
 fitfile <- file.path(root_path, "src", "2_estimation", "results", "simpler_models",
-                     paste0("jags_fit_WSLS_", group_name, ".RData")) 
+                     paste0("jags_fit_WSLS_", group_name, ".RData"))
 
 #This data is stored in GIT LFS ('git lfs install' to fetch them)
 load(fitfile)
@@ -38,6 +40,11 @@ X <- X / 100
 
 # Extract predictions
 x_pred <- samples$BUGSoutput$sims.list$x_pred
+
+#use a random subset of 1000 posterior draws (the loops below are slow
+draw_idx <- sample(dim(x_pred)[1], min(1000, dim(x_pred)[1]))
+x_pred <- x_pred[draw_idx, , , drop = FALSE]
+
 n_sims <- dim(x_pred)[1]
 
 plot_dir <- file.path(root_path, "src", "2_estimation",
@@ -48,6 +55,7 @@ dir.create(plot_dir, recursive = TRUE, showWarnings = FALSE)
 # STATISTIC 1: SWITCHES
 # ============================================================================
 
+# Observed switches: compare each actual choice with the actual previous choice
 calc_switches <- function(choices, ntrials) {
   switches <- numeric(nsubs)
   for (s in 1:nsubs) {
@@ -56,8 +64,17 @@ calc_switches <- function(choices, ntrials) {
   return(switches)
 }
 
+calc_switches_pred <- function(pred, obs, ntrials) {
+  switches <- numeric(nsubs)
+  for (s in 1:nsubs) {
+    n <- ntrials[s]
+    switches[s] <- sum(pred[s, 2:n] != obs[s, 1:(n-1)])
+  }
+  return(switches)
+}
+
 obs_switches <- calc_switches(x_obs, ntrials)
-pred_switches <- t(apply(x_pred, 1, calc_switches, ntrials = ntrials))
+pred_switches <- t(apply(x_pred, 1, calc_switches_pred, obs = x_obs, ntrials = ntrials))  # FIX 1
 
 # Bayesian p-value
 obs_total <- sum(obs_switches)
@@ -67,9 +84,9 @@ pval_switches <- mean(pred_total >= obs_total)
 # Plot
 p1 <- ggplot() +
   geom_histogram(aes(x = pred_total), fill = "skyblue", alpha = 0.6, bins = 50) +
-  geom_vline(xintercept = obs_total, color = "red", size = 1.5, linetype = "dashed") +
-  annotate("text", x = obs_total, y = Inf, 
-           label = sprintf("Obs = %d\np = %.3f", obs_total, pval_switches), 
+  geom_vline(xintercept = obs_total, color = "red", linewidth = 1.5, linetype = "dashed") +  # FIX 4: size -> linewidth
+  annotate("text", x = obs_total, y = Inf,
+           label = sprintf("Obs = %d\np = %.3f", obs_total, pval_switches),
            vjust = 1.5, hjust = -0.1, color = "red", fontface = "bold", size = 5) +
   labs(title = paste("Total Switches (WSLS Model):", group_name),
        x = "Total Switches", y = "Count") +
@@ -82,7 +99,7 @@ ggsave(file.path(plot_dir, paste0("switches_WSLS_", group_name, ".png")),
 # STATISTIC 2: WIN-STAY / LOSE-SWITCH PROBABILITIES
 # ============================================================================
 
-calc_wsls <- function(choices, outcomes, ntrials) {
+calc_wsls <- function(choices, outcomes, ntrials, prev_choices = choices) {
   # outcomes: X matrix (payoffs/100)
   # Returns matrix: [nsubs x 4] with win-stay, win-switch, lose-stay, lose-switch probs
   
@@ -99,12 +116,12 @@ calc_wsls <- function(choices, outcomes, ntrials) {
     lose_switch <- 0
     
     for (t in 1:(n-1)) {
-      current_choice <- choices[s, t]
+      current_choice <- prev_choices[s, t]   # actual choice on trial t (fixed from earlier)
       next_choice <- choices[s, t+1]
       outcome <- outcomes[s, t]
       
       stayed <- (current_choice == next_choice)
-      won <- (outcome > 0)  # simple win = positive outcome
+      won <- (outcome >= 0)  #outcome is good even if zero!!
       
       if (won) {
         if (stayed) {
@@ -144,10 +161,10 @@ obs_wsls <- calc_wsls(x_obs, X, ntrials)
 # Calculate for predicted data
 pred_wsls <- array(NA, dim = c(n_sims, nsubs, 4))
 for (i in 1:n_sims) {
-  pred_wsls[i,,] <- calc_wsls(x_pred[i,,], X, ntrials)
+  pred_wsls[i,,] <- calc_wsls(x_pred[i,,], X, ntrials, prev_choices = x_obs)  # FIX 1
 }
 
-# win stay lose switch, prepare data
+# win stay lose switch, prepare data.
 wsls_plot_data <- data.frame(
   Strategy = rep(c("Win-Stay", "Lose-Switch"), each = nsubs * 2),
   Probability = c(
@@ -179,7 +196,7 @@ ggsave(file.path(plot_dir, paste0("wsls_WSLS_", group_name, ".png")),
 # ============================================================================
 
 summary_file <- file.path(root_path, "src", "2_estimation",
-                          "posterior_predictive_checks", "posterior_predictive_plots", 
+                          "posterior_predictive_checks", "posterior_predictive_plots",
                           paste0("PPC_summary_WSLS_", group_name, ".txt"))
 
 sink(summary_file)
@@ -188,13 +205,14 @@ cat("\n===============================================\n")
 cat("POSTERIOR PREDICTIVE CHECK SUMMARY\n")
 cat("===============================================\n")
 cat("Group:", group_name, "\n")
-cat("Model: WSLS (Win-Stay-Lose-Shift)\n\n")
-cat("IF p value is <0.05 or >0.95, there is a significant mismatch between model and data!\n\n")
+cat("Model: WSLS (Win-Stay-Lose-Switch)\n\n")
+
+cat("If a p value is < 0.05 or > 0.95, the model may be missing this aspect of the data (possible misfit).\n\n")
 
 cat("SWITCHES:\n")
 cat(sprintf("  Observed total: %d\n", obs_total))
-cat(sprintf("  Predicted mean: %.1f [%.1f, %.1f]\n", 
-            mean(pred_total), 
+cat(sprintf("  Predicted mean: %.1f [%.1f, %.1f]\n",
+            mean(pred_total),
             quantile(pred_total, 0.025),
             quantile(pred_total, 0.975)))
 cat(sprintf("  Bayesian p-value: %.3f", pval_switches))
@@ -214,7 +232,7 @@ pred_ls_means <- rowMeans(pred_wsls[,, 4], na.rm = TRUE)
 pval_ws <- mean(pred_ws_means >= obs_ws_mean)
 pval_ls <- mean(pred_ls_means >= obs_ls_mean)
 
-cat(sprintf("  Win-Stay:    Obs=%.3f, Pred=%.3f [%.3f, %.3f], p=%.3f", 
+cat(sprintf("  Win-Stay:    Obs=%.3f, Pred=%.3f [%.3f, %.3f], p=%.3f",
             obs_ws_mean,
             mean(pred_ws_means),
             quantile(pred_ws_means, 0.025),

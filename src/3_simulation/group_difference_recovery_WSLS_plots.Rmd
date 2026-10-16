@@ -37,11 +37,10 @@ gpt2025_gpt2023 = "gpt25 − gpt23"
 )
 CONTRAST_COLORS <- c("purple", "#EB931A", '#27C237' )
 
-PARAMS <- c("prob_stay_win", "prob_stay_lose", "epsilon")
+PARAMS <- c("prob_stay_win", "prob_switch_lose")
 PARAM_LABELS <- c(
 prob_stay_win  = "P(Stay | Win)",
-prob_stay_lose = "P(Stay | Lose)",
-epsilon        = "Exploration (ε)"
+prob_switch_lose = "P(Switch | Lose)"
 )
 
 probit_to_prob <- pnorm #function to convert probit to probability (if needed)
@@ -51,7 +50,6 @@ probit_to_prob <- pnorm #function to convert probit to probability (if needed)
 # ---------------------------
 # LOAD DATA
 # ---------------------------
-#a mess params
 results <- read.csv(file.path(results_dir, "group_params_recovery.csv"))
 
 #contrasts (in probit AND probability space)
@@ -366,7 +364,8 @@ density_metrics <- map_dfr(PARAMS, function(param) {
       )
     })
   })
-  
+
+   
   # Aggregate across simulations to get recovery performance
   sim_summaries %>%
     group_by(group) %>%
@@ -396,9 +395,7 @@ density_metrics_table <- density_metrics %>%
     `95% CI (Probit)` = sprintf("[%.3f, %.3f]", mean_ci_lower, mean_ci_upper),
     RMSE = sprintf("%.3f", RMSE),
     Bias = sprintf("%.3f", Bias),
-    `Coverage (95% Credible Interval)` = ifelse(Coverage == 1, "TRUE", 
-                                                 ifelse(Coverage == 0, "FALSE",
-                                                        sprintf("%.0f%%", Coverage * 100)))
+    `Coverage (95% Credible Interval)` = sprintf("%.0f%%", Coverage * 100)
   ) %>%
   select(Parameter, Group, `True (Probit)`, `Mean (Probit)`, `SD (Probit)`, 
          `95% CI (Probit)`, RMSE, Bias, `Coverage (95% Credible Interval)`)
@@ -423,6 +420,115 @@ ggsave(file.path(plot_dir, "mu_density_metrics_table.png"),
 # Save as CSV
 write.csv(density_metrics_table, file.path(plot_dir, "mu_density_metrics.csv"), 
           row.names = FALSE)
+```
+
+# ---------------------------
+# 4. CONTRAST DETECTION RATE
+# How often the 95% credible interval of each group difference excludes 0
+# ---------------------------
+
+```{r}
+contrast_rows <- list()   # will hold one row per simulation x parameter x contrast
+
+for (sim in 1:length(samples_list)) {
+  samp <- samples_list[[sim]]
+
+  for (param in PARAMS) {
+    # Posterior draws of each group's mean (probit scale)
+    # Columns: 1 = human, 2 = gpt2023, 3 = gpt2025
+    draws   <- samp[[paste0("mu_", param, "_raw")]]
+    human   <- draws[, 1]
+    gpt2023 <- draws[, 2]
+    gpt2025 <- draws[, 3]
+
+    # Group differences, computed draw by draw
+    # (this gives the full posterior of each difference)
+    differences <- list(
+      gpt2023_human   = gpt2023 - human,
+      gpt2025_human   = gpt2025 - human,
+      gpt2025_gpt2023 = gpt2025 - gpt2023
+    )
+
+    for (contrast in names(differences)) {
+      d     <- differences[[contrast]]
+      lower <- unname(quantile(d, 0.025))   # bottom of the 95% interval
+      upper <- unname(quantile(d, 0.975))   # top of the 95% interval
+
+      contrast_rows[[length(contrast_rows) + 1]] <- data.frame(
+        sim_id        = sim,
+        parameter     = param,
+        contrast      = contrast,
+        lower         = lower,
+        upper         = upper,
+        excludes_zero = lower > 0 | upper < 0   # TRUE = a clear difference
+      )
+    }
+  }
+}
+
+# Stack all rows into one table
+contrast_detect <- do.call(rbind, contrast_rows)
+
+# Detection rate = share of simulations where the interval excludes 0
+# (the mean of TRUE/FALSE values is the proportion of TRUEs)
+detection_summary <- aggregate(excludes_zero ~ parameter + contrast,
+                               data = contrast_detect, FUN = mean)
+names(detection_summary)[3] <- "detection_rate"
+```
+
+
+```{r}
+# True difference in probability space, for the axis labels
+true_prob <- function(group, param) {
+  pnorm(true_params[[group]]$mu[[paste0(param, "_raw")]])
+}
+
+detection_summary$true_diff <- NA
+
+for (i in 1:nrow(detection_summary)) {
+  param  <- detection_summary$parameter[i]
+  groups <- strsplit(detection_summary$contrast[i], "_")[[1]]  # "gpt2025_human" -> "gpt2025", "human"
+  detection_summary$true_diff[i] <- true_prob(groups[1], param) - true_prob(groups[2], param)
+}
+
+# Labels: contrast name + its true difference, and the parameter name for the panel title
+detection_summary$label <- paste0(CONTRAST_NAMES[detection_summary$contrast],
+                                  "\n(true diff = ", sprintf("%+.2f", detection_summary$true_diff), ")")
+detection_summary$param_label <- PARAM_LABELS[detection_summary$parameter]
+
+# Same colours as the contrast plot
+contrast_fill <- c(gpt2023_human   = "purple",
+                   gpt2025_gpt2023 = "#EB931A",
+                   gpt2025_human   = "#27C237")
+
+detection_plot <- ggplot(detection_summary,
+                         aes(x = label, y = detection_rate, fill = contrast)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = sprintf("%.0f%%", detection_rate * 100)),
+            vjust = -0.5, size = 4) +
+  geom_hline(yintercept = 0.80, linetype = "dashed") +   # common power threshold
+  facet_wrap(~ param_label, scales = "free_x") +
+  scale_fill_manual(values = contrast_fill) +
+  scale_y_continuous(limits = c(0, 1.08), labels = scales::percent) +
+  labs(
+    title = "Contrast Detection Rate",
+    subtitle = "Share of simulations where the 95% credible interval of the difference excludes 0 (dashed line = 80%)",
+    x = NULL,
+    y = "Detection rate"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "none",                 # the x-axis labels already name each contrast
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+
+# Save plot and the numbers behind it
+ggsave(file.path(plot_dir, "contrast_detection_rate.png"),
+       plot = detection_plot, width = 10, height = 5, dpi = 300, bg = "white")
+
+write.csv(detection_summary[, c("parameter", "contrast", "true_diff", "detection_rate")],
+          file.path(plot_dir, "contrast_detection_rate.csv"), row.names = FALSE)
 ```
 
 

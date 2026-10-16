@@ -1,0 +1,7 @@
+"parameter","contrast","true_diff","detection_rate"
+"prob_stay_win","gpt2023_human",0.139999999995933,0.2
+"prob_switch_lose","gpt2023_human",-0.120000000006946,0.566666666666667
+"prob_stay_win","gpt2025_gpt2023",0.490000000004068,1
+"prob_switch_lose","gpt2025_gpt2023",0.150000000012281,0.833333333333333
+"prob_stay_win","gpt2025_human",0.630000000000001,1
+"prob_switch_lose","gpt2025_human",0.0300000000053353,0.0666666666666667

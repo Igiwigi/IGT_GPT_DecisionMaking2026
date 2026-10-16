@@ -54,11 +54,10 @@ rhat_long <- rhat_data %>%
 # ---------------------------
 p1 <- ggplot(rhat_long, aes(x = parameter, y = rhat)) +
   geom_boxplot(aes(fill = param_type)) +
-  geom_hline(yintercept = 1.1, linetype = "dashed", color = "red", linewidth = 1) +
   coord_flip() +
   labs(
     title = "Rhat Distribution by Parameter",
-    subtitle = "Red line = 1.1 (acceptable), 1.01 (ideal)",
+    subtitle = "1.1 (acceptable), 1.01 (ideal)",
     x = "Parameter",
     y = "Rhat",
     fill = "Parameter Type"

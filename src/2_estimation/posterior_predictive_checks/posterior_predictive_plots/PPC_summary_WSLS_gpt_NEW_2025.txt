@@ -3,15 +3,15 @@
 POSTERIOR PREDICTIVE CHECK SUMMARY
 ===============================================
 Group: gpt_NEW_2025 
-Model: WSLS (Win-Stay-Lose-Shift)
+Model: WSLS (Win-Stay-Lose-Switch)
 
-IF p value is <0.05 or >0.95, there is a significant mismatch between model and data!
+If a p value is < 0.05 or > 0.95, the model may be missing this aspect of the data (possible misfit).
 
 SWITCHES:
   Observed total: 773
-  Predicted mean: 772.9 [726.0, 819.0]
-  Bayesian p-value: 0.507
+  Predicted mean: 772.4 [725.0, 817.0]
+  Bayesian p-value: 0.498
 
 WIN-STAY / LOSE-SWITCH:
-  Win-Stay:    Obs=0.869, Pred=0.862 [0.846, 0.878], p=0.175
-  Lose-Switch: Obs=0.844, Pred=0.806 [0.763, 0.844], p=0.028 *
+  Win-Stay:    Obs=0.862, Pred=0.862 [0.846, 0.878], p=0.482
+  Lose-Switch: Obs=0.857, Pred=0.858 [0.814, 0.897], p=0.525

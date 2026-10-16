@@ -2,7 +2,7 @@
 # GROUP COMPARE AFTER VETTING MODEL
 # ============================================================================
 # WSLS script to compare the WSLS parameters between the real groups (human, GPT 2023, GPT 2025)
-# For reporting the differences between the main WSLS parameters: stay-win, stay-lose, epsilon
+# For reporting the differences between the main WSLS parameters: stay-win, stay-lose
 # Adapted the grp recovery script to real data (but only fitting once)
 # Should have maybe made more of this pipeline into functions etc.
 
@@ -18,7 +18,7 @@ probit_to_prob <- function(x) pnorm(x)
 root_path <- "~/IGT_LLM_DecisionMaking"
 results_dir <- file.path(root_path, "src/4_comparison/results/group_parameters")
 dir.create(results_dir, recursive = TRUE, showWarnings = FALSE)
-model_file <- file.path(root_path, "models", "simpler_models", "WSLS_hier_grp_compare.txt")
+model_file <- file.path(root_path, "models", "simpler_models", "2nd_try", "WSLS_hier_grp_no_epsilon.txt")
 
 # read in data for all groups
 old_gpt_data <- read.csv(file.path(root_path, "data", "final_data", "clean_gpt_OLD_2023.csv"))
@@ -76,23 +76,20 @@ for(i in 1:n_subjects){
   print(group_idx[i])
 }
 
-# Convert outcomes to binary (win=1, lose=0)
-X_binary <- ifelse(X_mat >= 0, 1, 0)
-
 # ---------------------------
 # PREPARE JAGS DATA
 # ---------------------------
 jags_data <- list(
   x = x_mat,
-  X = X_binary,
+  X = X_mat,
   ntrials = apply(!is.na(x_mat), 1, sum), #number of trials per subject (that arent NA)
   nsubs = n_subjects,
   group = group_idx,
   n_groups = 3
 )
 
-jags_params <- c("mu_prob_stay_win_raw", "mu_prob_stay_lose_raw", "mu_epsilon_raw",
-                 "lambda_prob_stay_win", "lambda_prob_stay_lose", "lambda_epsilon")
+jags_params <- c("mu_prob_stay_win_raw", "mu_prob_switch_lose_raw",
+                 "lambda_prob_stay_win", "lambda_prob_switch_lose")
 
 # ---------------------------
 # RUN JAGS
@@ -142,17 +139,14 @@ for(g in 1:length(group_names)){
   
   # Extract posterior distributions (probit)
   mu_prob_stay_win_raw <- sims_list$mu_prob_stay_win_raw[, g]
-  mu_prob_stay_lose_raw <- sims_list$mu_prob_stay_lose_raw[, g]
-  mu_epsilon_raw <- sims_list$mu_epsilon_raw[, g]
+  mu_prob_switch_lose_raw <- sims_list$mu_prob_switch_lose_raw[, g]
   lambda_prob_stay_win <- sims_list$lambda_prob_stay_win[, g]
-  lambda_prob_stay_lose <- sims_list$lambda_prob_stay_lose[, g]
-  lambda_epsilon <- sims_list$lambda_epsilon[, g]
-  
+  lambda_prob_switch_lose <- sims_list$lambda_prob_switch_lose[, g]
+
   # save in probability space, not probit
   mu_prob_stay_win_prob <- probit_to_prob(mu_prob_stay_win_raw)
-  mu_prob_stay_lose_prob <- probit_to_prob(mu_prob_stay_lose_raw)
-  mu_epsilon_prob <- probit_to_prob(mu_epsilon_raw)
-  
+  mu_prob_switch_lose_prob <- probit_to_prob(mu_prob_switch_lose_raw)
+
   # Summary statistics
   group_params <- rbind(group_params, data.frame(
     group = group_name,
@@ -162,22 +156,16 @@ for(g in 1:length(group_names)){
     mu_prob_stay_win_q025 = quantile(mu_prob_stay_win_prob, 0.025),
     mu_prob_stay_win_q975 = quantile(mu_prob_stay_win_prob, 0.975),
     
-    mu_prob_stay_lose_median = median(mu_prob_stay_lose_prob),
-    mu_prob_stay_lose_q025 = quantile(mu_prob_stay_lose_prob, 0.025),
-    mu_prob_stay_lose_q975 = quantile(mu_prob_stay_lose_prob, 0.975),
-    
-    mu_epsilon_median = median(mu_epsilon_prob),
-    mu_epsilon_q025 = quantile(mu_epsilon_prob, 0.025),
-    mu_epsilon_q975 = quantile(mu_epsilon_prob, 0.975),
+    mu_prob_switch_lose_median = median(mu_prob_switch_lose_prob),
+    mu_prob_switch_lose_q025 = quantile(mu_prob_switch_lose_prob, 0.025),
+    mu_prob_switch_lose_q975 = quantile(mu_prob_switch_lose_prob, 0.975),
     
     # Convergence diagnostics: rhat & effective size
     rhat_prob_stay_win = summary_mat[paste0("mu_prob_stay_win_raw[", g, "]"), "Rhat"],
-    rhat_prob_stay_lose = summary_mat[paste0("mu_prob_stay_lose_raw[", g, "]"), "Rhat"],
-    rhat_epsilon = summary_mat[paste0("mu_epsilon_raw[", g, "]"), "Rhat"],
+    rhat_prob_switch_lose = summary_mat[paste0("mu_prob_switch_lose_raw[", g, "]"), "Rhat"],
 
     n_eff_prob_stay_win = summary_mat[paste0("mu_prob_stay_win_raw[", g, "]"), "n.eff"], 
-    n_eff_prob_stay_lose = summary_mat[paste0("mu_prob_stay_lose_raw[", g, "]"), "n.eff"],
-    n_eff_epsilon = summary_mat[paste0("mu_epsilon_raw[", g, "]"), "n.eff"]
+    n_eff_prob_switch_lose = summary_mat[paste0("mu_prob_switch_lose_raw[", g, "]"), "n.eff"]
   ))
   
   # Print summary
@@ -186,14 +174,10 @@ for(g in 1:length(group_names)){
               median(mu_prob_stay_win_prob), 
               quantile(mu_prob_stay_win_prob, 0.025),
               quantile(mu_prob_stay_win_prob, 0.975)))
-  cat(sprintf("  P(stay|lose): %.3f [%.3f, %.3f]\n", 
-              median(mu_prob_stay_lose_prob),
-              quantile(mu_prob_stay_lose_prob, 0.025),
-              quantile(mu_prob_stay_lose_prob, 0.975)))
-  cat(sprintf("  Epsilon: %.3f [%.3f, %.3f]\n", 
-              median(mu_epsilon_prob),
-              quantile(mu_epsilon_prob, 0.025),
-              quantile(mu_epsilon_prob, 0.975)))
+  cat(sprintf("  P(switch|lose): %.3f [%.3f, %.3f]\n", 
+              median(mu_prob_switch_lose_prob),
+              quantile(mu_prob_switch_lose_prob, 0.025),
+              quantile(mu_prob_switch_lose_prob, 0.975)))
 }
 
 # ---------------------------
@@ -201,7 +185,7 @@ for(g in 1:length(group_names)){
 # ---------------------------
 cat("\n=== GROUP CONTRASTS ===\n")
 
-param_names <- c("prob_stay_win", "prob_stay_lose", "epsilon")
+param_names <- c("prob_stay_win", "prob_switch_lose")
 cat("\nComputing contrasts for parameters:", paste(param_names, collapse=", "), "! \n")
 
 for(param in param_names){

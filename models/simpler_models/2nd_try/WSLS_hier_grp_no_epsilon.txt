@@ -1,0 +1,43 @@
+model {
+
+ # Hyperpriors for group-level distributions
+ # NO EPSILON ANYMORE
+  
+  for (g in 1:n_groups) {
+    mu_prob_stay_win_raw[g] ~ dnorm(0, 1)
+    lambda_prob_stay_win[g] ~ dgamma(1, 0.5)
+    mu_prob_stay_win[g] <- phi(mu_prob_stay_win_raw[g])  #probit
+
+    mu_prob_switch_lose_raw[g] ~ dnorm(0, 1)
+    lambda_prob_switch_lose[g] ~ dgamma(1, 0.5)
+    mu_prob_switch_lose[g] <- phi(mu_prob_switch_lose_raw[g])  #probit
+  }
+
+  for (s in 1:nsubs) {
+
+    # Subject-level parameters drawn from group's distribution(!!)
+    prob_stay_win_raw[s] ~ dnorm(mu_prob_stay_win_raw[group[s]], lambda_prob_stay_win[group[s]])
+    prob_stay_win[s] <- phi(prob_stay_win_raw[s])
+
+    prob_switch_lose_raw[s] ~ dnorm(mu_prob_switch_lose_raw[group[s]], lambda_prob_switch_lose[group[s]])
+    prob_switch_lose[s] <- phi(prob_switch_lose_raw[s])
+
+    for (t in 2:ntrials[s]) {
+
+      # Win if the previous outcome was zero or positive (X = raw outcomes, not 0/1)
+      is_win[s, t] <- ifelse(X[s, t-1] >= 0, 1, 0)
+
+      stay_prob[s, t] <- ifelse(is_win[s, t] == 1,
+                                prob_stay_win[s],
+                                1 - prob_switch_lose[s])
+
+      for (d in 1:4) {
+        p[s, t, d] <- ifelse(d == x[s, t-1],
+                             stay_prob[s, t],
+                             (1 - stay_prob[s, t]) / 3)
+      }
+
+      x[s, t] ~ dcat(p[s, t, ])
+    }
+  }
+}

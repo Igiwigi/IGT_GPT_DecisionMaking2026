@@ -1,11 +1,10 @@
 # ============================================================================
-# VISUALIZATION FOR THE FIT REAL DATA: group differences (contrasts) in terms of WSLS parameters & outcome differences
+# VISUALIZATION FOR THE FIT REAL DATA: group differences (contrasts) in terms of WSLS parameters
 # ============================================================================
-# This script loads the saved results from the 2 fittings (fit hier WSLS model & fit simple outcome model) & makes plots
-# Namely: plots for WSLS parameters & contrasts, and plots for outcome difference & contrast
-# Also: density plots for both using posterior samples & some cvs including reportable data
+# This script loads the saved results from the fit hier WSLS model & makes plots
+# Namely: plots for WSLS parameters & contrasts
+# Also: density plots for using posterior samples & some cvs including reportable data
 # ============================================================================
-#a bit of a mess
 
 ```{r setup, include=FALSE}
 library(pacman)
@@ -27,13 +26,8 @@ dir.create(plot_dir, showWarnings = FALSE)
 contrasts <- read_csv(file.path(results_dir, "group_parameters", "group_parameter_contrasts.csv"),show_col_types = FALSE)
 estimates <- read_csv(file.path(results_dir, "group_parameters", "group_parameter_estimates.csv"),show_col_types = FALSE)
 
-# Read the data (outcome contrasts)
-outcome_contrast <- read_csv(file.path(results_dir, "outcomes", "group_outcome_contrasts.csv"),show_col_types = FALSE)
-outcome_estimate <- read_csv(file.path(results_dir, "outcomes", "group_outcome_estimates.csv"),show_col_types = FALSE)
-
 # Load posterior samples
 posterior_samples_param <- readRDS(file.path(results_dir, "group_parameters", "posterior_samples.rds"))
-posterior_samples_outcome <- readRDS(file.path(results_dir, "outcomes", "posterior_outcome_samples.rds"))
 
 ```
 
@@ -57,8 +51,8 @@ plot_estimates <- estimates %>%
     ),
     parameter = factor(
       parameter,
-      levels = c("prob_stay_win", "prob_stay_lose", "epsilon"),
-      labels = c("P(stay|win)", "P(stay|lose)", "Epsilon")
+      levels = c("prob_stay_win", "prob_switch_lose"),
+      labels = c("P(stay|win)", "P(switch|lose)")
     )
   )
 
@@ -108,12 +102,13 @@ plot_contrasts <- diffs_long %>%
     ),
     parameter = factor(
       parameter,
-      levels = c("prob_stay_win", "prob_stay_lose", "epsilon"),
-      labels = c("P(stay|win)", "P(stay|lose)", "Epsilon")
+      levels = c("prob_stay_win", "prob_switch_lose"),
+      labels = c("P(stay|win)", "P(switch|lose)")
     )
   )
 
 ```
+
 ```{r}
 # Create the plot (estimates)
 ggplot(plot_estimates, aes(x = group, y = median, fill = group)) +
@@ -148,29 +143,22 @@ ggsave(filename = file.path(plot_dir, "parameter_estimates_plot.png"),width = 10
 
 ```
 ```{r}
-#make a bar plot, contrast comparison + the bayesian percentage of differnece
 ggplot(plot_contrasts, aes(x = parameter, y = median, fill = comparison)) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "grey60") +
+  geom_hline(yintercept = 0,
+             linetype = "dashed",
+             color = "grey60") +
   geom_col(width = 0.6) +
-  geom_errorbar(
-    aes(ymin = q025, ymax = q975),
-    width = 0.2,
-    linewidth = 0.5
-  ) +
-  # Probabilities as colored text with legend
+  geom_errorbar(aes(ymin = q025, ymax = q975),
+                width = 0.2,
+                linewidth = 0.5) +
   geom_text(
-    aes(label = scales::percent(prob, accuracy = 1), color = prob, y = q975 + 0.02),
+    aes(label = paste0((round(prob, 2) * 100), "%"), y = q975 + 0.01),
     position = position_dodge(width = 0.6),
     size = 3,
     vjust = -0.3,
     fontface = "bold"
   ) +
-  scale_color_gradient(
-    name = "Probability that\n(first group > second group)\n(if near 0% or 100%, strong evidence for difference)\n",
-    low = "blue",
-    high = "darkred"
-  ) +
-  facet_wrap(~ comparison, nrow = 1) +
+  facet_wrap( ~ comparison) +
   scale_fill_manual(
     name = "Contrast",
     values = c(
@@ -179,23 +167,28 @@ ggplot(plot_contrasts, aes(x = parameter, y = median, fill = comparison)) +
       "GPT-2025 vs GPT-2023" = "#EB931A"
     )
   ) +
-  labs(
-    y = "Difference (median ± 95% CI)",
-    x = NULL,
-    title = "Parameter Contrasts Across Model Comparisons (Probability Space)"
-  ) +
+  labs(y = "Difference (median ± 95% CI)", x = NULL, title = "Parameter Contrasts Across Model Comparisons (Probability Space)", 
+  subtitle = "(Probability that first group > second group)\n") +
   theme_bw() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    axis.text.x = element_text(angle = 45, hjust = 1)
+  theme(panel.grid.major.x = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))+
+  theme(plot.margin = margin(0.5,0.1,0.5,0.1, "cm"))+
+  scale_y_continuous(
+  expand = expansion(mult = c(0.05, 0.15)),
+  breaks = seq(-0.5, 1, 0.1)
   )
+
 
 ggsave(
   filename = file.path(plot_dir, "parameter_contrasts_plot.png"),
-  width = 10, height = 4, dpi = 300
+  width = 12,
+  height = 4,
+  dpi = 300
 )
 
 ```
+
+
 ```{r RHAT & NEFF summary}
 #quick summary of the Rhat and n_eff values for the group-level parameters (for reporting in the paper)
 rhat_neff_summary <- estimates %>%
@@ -229,144 +222,12 @@ CI_summary <- plot_contrasts %>%
 write_csv(CI_summary, file.path(plot_dir, "group_PARAMETER_contrast_CI_summary.csv"))
 ```
 
-# ============================================================================
-# 3. PLOTS FOR *OUTCOME* CONTRAST! (estimates and contrasts)
-# ============================================================================
-```{r}
-#RESHAPE dfs for plotting (outcome estimate and contrast)
-plot_estimates_outcome <- outcome_estimate %>%
-  select(group, starts_with("mu_")) %>%
-  pivot_longer(
-    -group,
-    names_to = c("parameter", ".value"),
-    names_pattern = "mu_(.*)_(median|q025|q975)"
-  ) %>%
-  mutate(
-    group = factor(
-      group,
-      levels = c("ahn_hc", "gpt_OLD_2023", "gpt_NEW_2025"),
-      labels = c("Human Controls", "GPT-2023", "GPT-2025")
-    ),
-    parameter = factor(
-      parameter,
-      levels = c("prob_win"),
-      labels = c("P(win)")
-    )
-  )
-
-outcome_contrast_plot <- outcome_contrast %>%
-  mutate(
-    contrast = factor(
-      contrast,
-      levels = c("GPT-2023 vs HC", "GPT-2025 vs HC", "GPT-2025 vs GPT-2023"),
-      labels = c("GPT-2023 vs Human", "GPT-2025 vs Human", "GPT-2025 vs GPT-2023")
-    )
-  )
-```
-
-```{r}
-#plot probability of winning
-ggplot(plot_estimates_outcome, aes(x = group, y = median, fill = group)) +
-  geom_col(width = 0.6) +
-  geom_errorbar(
-    aes(ymin = q025, ymax = q975),
-    width = 0.25,
-    linewidth = 0.5
-  ) +
-  scale_fill_manual(
-    values = c(
-      "Human Controls" = "#3498db",
-      "GPT-2023" = "#e74c3c",
-      "GPT-2025" = "#fcc200"
-    )
-  ) +
-  scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.2)) +
-  labs(
-    y = "Probability of Winning (median ± 95% CI)",
-    x = NULL,
-    title = "Group-Level Win Rates (Probability Space)"
-  ) +
-  theme_bw(base_size = 12) +
-  theme(
-    panel.grid.major.x = element_blank()
-  ) +
-  geom_text(
-    aes(label = sprintf("%.3f%%", median)),
-    vjust = -1.045,
-    size = 4,
-    fontface = "bold"
-  )
-
-ggsave(filename = file.path(plot_dir, "outcome_estimates_plot.png"),width = 6,height = 4,dpi = 300)
-```
-```{r}
-ggplot(outcome_contrast_plot, aes(x = median, y = contrast, color = contrast)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "grey60", linewidth = 0.8) +
-  geom_errorbar(
-    aes(xmin = q025, xmax = q975),
-    width = 0.2,
-    linewidth = 1
-  ) +
-  geom_point(size = 5) +
-  scale_color_manual(
-    values = c(
-      "GPT-2023 vs Human" = "purple",
-      "GPT-2025 vs Human" = "#27C237",
-      "GPT-2025 vs GPT-2023" = "#EB931A"
-    )
-  ) +
-  labs(
-    x = "Difference in P(win) (median ± 95% CI)",
-    y = NULL,
-    title = "Win Rate Contrasts Across Groups"
-  ) +
-  theme_bw(base_size = 12) +
-  theme(
-    panel.grid.major.y = element_line(color = "grey90"),
-    panel.grid.minor = element_blank()
-  )
-
-ggsave(filename = file.path(plot_dir, "outcome_contrasts_plot.png"),width = 6,height = 4,dpi = 300)
-```
-```{r RHAT & NEFF}
-#quick summary of the Rhat and n_eff values for the group-level parameters (for reporting in the paper)
-rhat_neff_summary_outcome <- outcome_estimate %>%
-  select(group, starts_with("rhat_"), starts_with("n_eff_")) %>%
-  mutate(across(.cols = -group, .fns = ~ round(.x, 3))) %>%
-  mutate(group = recode(group,
-                        "ahn_hc" = "human",
-                        "gpt_OLD_2023" = "gpt2023",
-                        "gpt_NEW_2025" = "gpt2025"))
-
-#save as csv
-write_csv(rhat_neff_summary_outcome, file.path(plot_dir, "group_OUTCOME_convergence_summary.csv"))
-```
-
-```{r CI}
-#credible interval for the outcome param (for each grp separately)
-CI_summary <- plot_estimates_outcome %>%
-  select(group, parameter, median, q025, q975) %>%
-  mutate(across(c(median, q025, q975), ~ round(.x, 2))) %>%
-  arrange(parameter, group)
-
-write_csv(CI_summary, file.path(plot_dir, "group_OUTCOME_CI_summary.csv"))
-
-#credible interval for the outcome contrasts 
-CI_summary <- outcome_contrast_plot %>%
-  select(contrast, median, q025, q975) %>%
-  mutate(across(c(median, q025, q975), ~ round(.x, 2))) %>%
-  arrange(contrast)
-
-write_csv(CI_summary, file.path(plot_dir, "group_OUTCOME_contrast_CI_summary.csv"))
-```
-
-
 # ---------------------------
-# 4. DENSITY PLOTS FOR GROUP ESTIMATE PARAMETERS (using group difference model samples)
+# 3. DENSITY PLOTS FOR GROUP ESTIMATE PARAMETERS (using group difference model samples)
 # ---------------------------
 ```{r}
 # Extract and transform posterior samples for each group
-param_names <- c("prob_stay_win", "prob_stay_lose", "epsilon")
+param_names <- c("prob_stay_win", "prob_switch_lose")
 group_names <- c("ahn_hc", "gpt_OLD_2023", "gpt_NEW_2025")
 group_labels <- c("Human Controls", "GPT-2023", "GPT-2025")
 
@@ -394,8 +255,8 @@ density_data <- density_data %>%
   mutate(
     parameter = factor(
       parameter,
-      levels = c("prob_stay_win", "prob_stay_lose", "epsilon"),
-      labels = c("P(stay|win)", "P(stay|lose)", "Epsilon")
+      levels = c("prob_stay_win", "prob_switch_lose"),
+      labels = c("P(stay|win)", "P(switch|lose)")
     ),
     group = factor(group, levels = group_labels)
   )
@@ -439,66 +300,4 @@ ggplot(density_data, aes(x = value, fill = group, color = group)) +
   )
 
 ggsave(filename = file.path(plot_dir, "parameter_densities_plot.png"), width = 12, height = 4, dpi = 300)
-```
-
-# ---------------------------
-# 5. DENSITY PLOTS FOR GROUP OUTCOME PARAMETERS (using outcome model samples)
-# ---------------------------
-```{r}
-density_data2 <- data.frame()
-
-group_labels <- c("Human Controls", "GPT-2023", "GPT-2025")
-
-for (g in 1:3) {
-  # Extract raw samples and convert to probability scale
-  samples_prob <- probit_to_prob(posterior_samples_outcome$mu_prob_win_raw[, g])
-  
-  # Bind into long dataframe
-  density_data2 <- rbind(
-    density_data2,
-    data.frame(
-      parameter = "P(win)",
-      group = group_labels[g],
-      value = samples_prob
-    )
-  )
-}
-
-# Ensure factor ordering
-density_data2$group <- factor(density_data2$group, levels = group_labels)
-
-# Plot density
-ggplot(density_data2, aes(x = value, fill = group, color = group)) +
-  geom_density(alpha = 0.3, linewidth = 1.2) +
-  scale_fill_manual(
-    name = "Group",
-    values = c(
-      "Human Controls" = "#3498db",
-      "GPT-2023" = "#e74c3c",
-      "GPT-2025" = "#fcc200"
-    )
-  ) +
-  scale_color_manual(
-    name = "Group",
-    values = c(
-      "Human Controls" = "#2980b9",
-      "GPT-2023" = "#c0392b",
-      "GPT-2025" = "#d4a800"
-    )
-  ) +
-  scale_x_continuous(breaks = seq(0, 1, 0.1), limits = c(0, 1)) +
-  labs(
-    x = "P(win)",
-    y = "Posterior Density",
-    title = "Posterior Distributions of Group-Level Win Probabilities"
-  ) +
-  theme_bw(base_size = 13) +
-  theme(
-    legend.position = "bottom",
-    legend.title = element_text(face = "bold"),
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    panel.grid.minor = element_blank()
-  )
-
-ggsave(filename = file.path(plot_dir, "outcome_densities_plot.png"),width = 12,height = 4,dpi = 300)
 ```

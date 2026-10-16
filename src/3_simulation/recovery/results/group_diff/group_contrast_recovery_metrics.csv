@@ -1,10 +1,7 @@
 "parameter","contrast","bias","rmse"
-"prob_stay_win","gpt2023_human",NA,NA
-"prob_stay_win","gpt2025_human",NA,NA
-"prob_stay_win","gpt2025_gpt2023",NA,NA
-"prob_stay_lose","gpt2023_human",NA,NA
-"prob_stay_lose","gpt2025_human",NA,NA
-"prob_stay_lose","gpt2025_gpt2023",NA,NA
-"epsilon","gpt2023_human",NA,NA
-"epsilon","gpt2025_human",NA,NA
-"epsilon","gpt2025_gpt2023",NA,NA
+"prob_stay_win","gpt2023_human",-0.00434421422928176,0.0779991305108751
+"prob_stay_win","gpt2025_human",-0.0290667441532926,0.0593648770546519
+"prob_stay_win","gpt2025_gpt2023",-0.0247225299240108,0.0786837118167797
+"prob_switch_lose","gpt2023_human",-0.0139634240685586,0.0647771085749229
+"prob_switch_lose","gpt2025_human",0.000517858862115413,0.0409308362430186
+"prob_switch_lose","gpt2025_gpt2023",0.014481282930674,0.0644201082164789
